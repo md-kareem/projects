@@ -1,0 +1,160 @@
+import React, { useState, useEffect } from 'react';
+import { UserCircle, History, Zap, Loader2 } from 'lucide-react';
+import ComplaintForm from '../components/ComplaintForm';
+import ComplaintCard from '../components/ComplaintCard';
+import Sidebar from '../components/Sidebar';
+import { useAuth } from '../context/AuthContext'; 
+
+const CitizenDashboard = () => {
+  const { user } = useAuth();
+
+  // 1. Start with an empty vault instead of fake data
+  const [myComplaints, setMyComplaints] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // 2. The Data Fetcher: Runs automatically when the page loads!
+  useEffect(() => {
+    const fetchRealLogs = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('http://localhost:8000/complaints/', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (!response.ok) throw new Error("Failed to fetch database logs.");
+        
+        const dbData = await response.json();
+
+        // 3. Translate the Database words into Frontend words
+        const formattedData = dbData.map(dbItem => ({
+          id: dbItem.id,
+          title: dbItem.title,
+          description: dbItem.description,
+          location: dbItem.address || "Location pending GPS", 
+          date: "Recently", 
+          priority: dbItem.severity?.toLowerCase() || "medium",
+          status: dbItem.status || "Pending review",
+          image_url: dbItem.image_url
+        }));
+
+        // Put the newest complaints at the top!
+        const sortedData = formattedData.sort((a, b) => b.id - a.id);
+        
+        setMyComplaints(sortedData);
+      } catch (error) {
+        console.error("Dashboard connection error:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchRealLogs();
+  }, []); // The empty brackets [] mean "run this once when the page opens"
+
+  // 4. Update the live UI when a new form is submitted
+  const handleNewSubmission = (savedComplaint) => {
+    // Translate the single new record coming straight from the ComplaintForm
+    const formattedNewReport = {
+      id: savedComplaint.id,
+      title: savedComplaint.title,
+      description: savedComplaint.description,
+      location: savedComplaint.address || "Location pending GPS",
+      date: "Just now",
+      priority: savedComplaint.severity || "medium",
+      status: savedComplaint.status || "Pending review",
+      image_url: savedComplaint.image_url || null
+    };
+
+    // Add it to the top of the UI instantly
+    setMyComplaints((prevComplaints) => [formattedNewReport, ...prevComplaints]);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  return (
+    <div className="flex h-screen bg-zinc-950 overflow-hidden">
+      
+      <Sidebar />
+
+      <main className="flex-1 overflow-y-auto p-6 md:p-10 relative">
+        
+        <div className="absolute top-[-10%] right-[-5%] w-[40%] h-[40%] bg-emerald-900/10 blur-[120px] rounded-full pointer-events-none"></div>
+
+        <div className="max-w-7xl mx-auto space-y-8 relative z-10">
+          
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-zinc-800 pb-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-zinc-900 border border-zinc-700 rounded-xl text-emerald-500 shadow-inner">
+                <UserCircle size={32} />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-zinc-100 uppercase tracking-widest">
+                  Citizen <span className="text-emerald-500">Terminal</span>
+                </h1>
+                <p className="text-sm font-mono text-zinc-400 mt-1">
+                  WELCOME BACK // {user?.name?.toUpperCase() || 'AUTHORIZED USER'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <div className="lg:col-span-7 space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Zap size={18} className="text-amber-500" />
+                <h2 className="text-lg font-mono font-bold text-zinc-300 uppercase tracking-wider">
+                  Initiate New Report
+                </h2>
+              </div>
+              
+              <ComplaintForm onSubmit={handleNewSubmission} />
+            </div>
+
+            <div className="lg:col-span-5 space-y-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <History size={18} className="text-emerald-500" />
+                  <h2 className="text-lg font-mono font-bold text-zinc-300 uppercase tracking-wider">
+                    My Active Logs
+                  </h2>
+                </div>
+                <span className="text-xs font-mono bg-zinc-900 text-zinc-400 px-2 py-1 rounded border border-zinc-800">
+                  {myComplaints.length} RECORDS
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-4 max-h-[800px] overflow-y-auto pr-2 custom-scrollbar">
+                
+                {/* Show a spinner while fetching from Python */}
+                {isLoading ? (
+                   <div className="flex items-center justify-center p-10 text-emerald-500">
+                     <Loader2 className="animate-spin" size={32} />
+                   </div>
+                ) : (
+                  <>
+                    {myComplaints.map(complaint => (
+                      <ComplaintCard key={complaint.id} complaint={complaint} />
+                    ))}
+                    
+                    {myComplaints.length === 0 && (
+                      <div className="p-8 text-center border-2 border-dashed border-zinc-800 rounded-xl bg-zinc-900/30">
+                        <p className="text-zinc-500 font-mono text-sm">NO ACTIVE LOGS FOUND</p>
+                      </div>
+                    )}
+                  </>
+                )}
+
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+};
+
+export default CitizenDashboard;

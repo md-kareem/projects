@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =========================================
+   LEAFLET MAP DARK THEME OVERRIDES
+   ========================================= */
+
+/* 1. Darken the Zoom +/- Buttons */
+.leaflet-bar a {
+  background-color: #18181b !important; /* zinc-900 */
+  color: #71717a !important; /* zinc-500 */
+  border-bottom: 1px solid #27272a !important; /* zinc-800 */
+}
+
+.leaflet-bar a:hover {
+  background-color: #27272a !important;
+  color: #3b82f6 !important; /* blue-500 */
+}
+
+/* 2. Darken the Popup Tooltips */
+.leaflet-popup-content-wrapper, 
+.leaflet-popup-tip {
+  background-color: #18181b !important;
+  color: #f4f4f5 !important;
+  border: 1px solid #27272a;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.8) !important;
+  border-radius: 0.5rem !important;
+}
+
+/* 3. Make the bottom-right attribution text blend in */
+.leaflet-control-attribution {
+  background-color: rgba(24, 24, 27, 0.7) !important; /* Transparent zinc-900 */
+  color: #52525b !important; /* zinc-600 */
+}
+
+.leaflet-control-attribution a {
+  color: #3b82f6 !important;
+}
