@@ -7,7 +7,8 @@ function Login() {
   const { login, isLoading } = useAuth();
   const [credentials, setCredentials] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState('Citizen');
+  // Updated default state to match the new inclusive tab name
+  const [activeTab, setActiveTab] = useState('Citizen/Resident');
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -56,18 +57,18 @@ function Login() {
               Secure Access Terminal
             </p>
           </div>
-
+          
           {/* Role Tabs */}
-          <div className="flex bg-zinc-900/50 rounded-lg p-1 mb-8 border border-zinc-800/50">
-            {['Citizen', 'Dept', 'Worker', 'Admin'].map((role) => (
+          <div className="grid grid-cols-2 gap-2 mb-8">
+            {['Citizen/Resident', 'Dept', 'Worker', 'Admin'].map((role) => (
               <button
                 key={role}
                 type="button"
                 onClick={() => setActiveTab(role)}
-                className={`flex-1 py-2.5 text-[10px] sm:text-xs font-mono uppercase tracking-wider rounded-md transition-all duration-200 ${
+                className={`py-3 px-2 text-[10px] sm:text-xs font-mono uppercase tracking-widest rounded-md transition-all duration-200 border ${
                   activeTab === role
-                    ? 'bg-zinc-800 text-emerald-400 shadow-sm border border-zinc-700/50'
-                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/30'
+                    ? 'bg-zinc-800 text-emerald-400 shadow-sm border-zinc-700/50'
+                    : 'bg-zinc-900/30 text-zinc-500 border-zinc-800/50 hover:text-zinc-300 hover:bg-zinc-800/50'
                 }`}
               >
                 {role}
@@ -148,7 +149,7 @@ function Login() {
           </form>
 
           {/* Dynamic Registration Link */}
-          {activeTab === 'Citizen' && (
+          {activeTab === 'Citizen/Resident' && (
             <div className="mt-6 text-center">
               <p className="text-xs font-mono text-zinc-500 uppercase tracking-widest">
                 New to the network?
@@ -157,7 +158,7 @@ function Login() {
                 to="/register"
                 className="text-xs font-mono text-emerald-500 hover:text-emerald-400 uppercase tracking-widest mt-1 inline-block border-b border-emerald-500/30 hover:border-emerald-400 pb-0.5 transition-all"
               >
-                Initiate Citizen Registration
+                Initiate Citizen/Resident Registration
               </Link>
             </div>
           )}

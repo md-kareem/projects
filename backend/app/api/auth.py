@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from sqlalchemy.orm import Session
+import jwt
 
 # Import database dependency
 from app.db.database import get_db
@@ -9,13 +10,47 @@ from app.db.database import get_db
 from app.models.user import User
 from app.schemas.user_schema import UserCreate, UserResponse, Token
 
-# Import your specific Engine!
+# Import your specific Security Engine
 from app.services import auth as auth_service
 
 router = APIRouter(
     prefix="/api/auth",
     tags=["Authentication"]
 )
+
+# This tells FastAPI where the frontend goes to get the token
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    """
+    This function acts as the security guard. It intercepts the incoming request,
+    reads the JWT token, decodes the user's ID, and fetches them from the database.
+    """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    try:
+        # Decode the token using the secret key from your services file
+        payload = jwt.decode(token, auth_service.SECRET_KEY, algorithms=[auth_service.ALGORITHM])
+        
+        # We stored the user ID in the "sub" field during login
+        user_id_str: str = payload.get("sub")
+        if user_id_str is None:
+            raise credentials_exception
+            
+    except jwt.PyJWTError: # Catch any token tampering or expiration
+        raise credentials_exception
+        
+    # Fetch the actual user from the database
+    user = db.query(User).filter(User.id == int(user_id_str)).first()
+    if user is None:
+        raise credentials_exception
+        
+    return user
+
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register_user(user: UserCreate, db: Session = Depends(get_db)):
@@ -69,7 +104,6 @@ def login_user(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = D
         )
         
     # 2. If they pass, mint the Golden Ticket!
-    # Using your services/auth.py token generator
     access_token = auth_service.create_access_token(
         data={"sub": str(user.id), "role": user.role}
     )

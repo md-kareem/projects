@@ -43,11 +43,12 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     # Make a copy of the data (e.g., {"sub": "user@email.com", "role": "Citizen"})
     to_encode = data.copy()
     
-    # Calculate exactly when this token should expire
+    # Calculate exactly when this token should expire using your global variable
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
+        # CHANGED: Now correctly uses your 24-hour variable instead of a hardcoded 15 minutes
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         
     # Add the expiration time to the token's data payload
     to_encode.update({"exp": expire})

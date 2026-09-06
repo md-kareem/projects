@@ -1,10 +1,12 @@
-# 1. FIX: Added 'status' to the import list right here!
 from fastapi import APIRouter, Depends, HTTPException, status 
 from sqlalchemy.orm import Session
 from typing import List
 
 from app.db.database import SessionLocal
 from app.models.complaint import Complaint
+from app.models.user import User
+# FIXED: The import now correctly points to your api/auth.py file!
+from app.api.auth import get_current_user
 from app.schemas.complaint_schema import ComplaintCreate, ComplaintResponse
 from app.services.ai_service import analyze_complaint_severity
 
@@ -20,10 +22,10 @@ def get_db():
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 def create_complaint(
-    # 2. FIX: We are using your Pydantic schema now instead of a plain dict!
     complaint: ComplaintCreate, 
     db: Session = Depends(get_db),
-    # current_user: User = Depends(get_current_user) # Keep this disabled for now
+    # ACTIVATED: We now securely identify the user submitting the form!
+    current_user: User = Depends(get_current_user) 
 ):
     print("--- NEW CITIZEN REPORT RECEIVED ---")
     
@@ -39,12 +41,11 @@ def create_complaint(
     new_complaint = Complaint(
         title=complaint.title,
         description=description_text,
-        category=complaint.category, # <--- THIS IS THE MISSING PIECE! 🧩
-        # Using getattr as a safety net in case your schema uses 'location' instead of 'address'
+        category=complaint.category, 
         address=getattr(complaint, 'address', getattr(complaint, 'location', "Location pending GPS")),
-        severity=ai_calculated_severity,  # <--- The AI is now in control of this field!
+        severity=ai_calculated_severity,  
         status="Pending",
-        user_id=1, # Fake test user ID until Phase 6
+        user_id=current_user.id, # <--- CHANGED: Now saves to the actual logged-in user!
         image_url=complaint.image_url
     )
     
@@ -54,8 +55,18 @@ def create_complaint(
     
     return new_complaint
 
+
 @router.get("/", response_model=List[ComplaintResponse])
-def read_complaints(db: Session = Depends(get_db)):
-    # This fetches every complaint in the vault and sends it back to the frontend
-    complaints = db.query(Complaint).all()
+def read_complaints(
+    db: Session = Depends(get_db),
+    # ADDED: Backend now demands a secure token to read the database
+    current_user: User = Depends(get_current_user)
+):
+    # Filter strictly for Citizen accounts
+    if current_user.role.lower() == "citizen":
+        complaints = db.query(Complaint).filter(Complaint.user_id == current_user.id).all()
+    # Admins, Depts, and Workers need to see all records to manage the city
+    else:
+        complaints = db.query(Complaint).all()
+        
     return complaints

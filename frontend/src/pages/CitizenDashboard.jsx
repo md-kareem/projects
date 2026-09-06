@@ -91,7 +91,7 @@ const CitizenDashboard = () => {
               </div>
               <div>
                 <h1 className="text-3xl font-bold text-zinc-100 uppercase tracking-widest">
-                  Citizen <span className="text-emerald-500">Terminal</span>
+                  CITIZEN/RESIDENT <span className="text-emerald-500">Terminal</span>
                 </h1>
                 <p className="text-sm font-mono text-zinc-400 mt-1">
                   WELCOME BACK // {user?.name?.toUpperCase() || 'AUTHORIZED USER'}
