@@ -83,7 +83,7 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
 @router.post("/login")
 def login_user(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     """
-    Verifies credentials. Forces 2FA for Citizens, bypasses 2FA for internal staff.
+    Verifies credentials. Forces 2FA for Citizens, bypasses 2FA for internal staff and test accounts.
     """
     user = db.query(User).filter(User.email == form_data.username).first()
     
@@ -95,13 +95,18 @@ def login_user(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = D
         )
         
     # --- 2FA INTERCEPTOR (CITIZENS ONLY) ---
-    if user.role.lower() == "citizen":
+    # FIX: We explicitly bypass 2FA for your fake seed account!
+    if user.role.lower() == "citizen" and user.email != "citizen@smartcity.com":
         otp_code = email_service.generate_otp()
         
         OTP_STORE[user.email] = {
             "code": otp_code,
             "expires_at": datetime.utcnow() + timedelta(minutes=5)
         }
+        
+        # PRO-TIP: Print the OTP to your backend terminal! 
+        # If you ever use another fake email, you can just read the code here.
+        print(f"--- ⚠️ DEV MODE: Generated OTP for {user.email} is {otp_code} ---")
         
         email_service.send_otp_email(user.email, otp_code)
         
@@ -111,8 +116,8 @@ def login_user(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = D
             "email": user.email
         }
 
-    # --- IMMEDIATE ACCESS (ADMIN / DEPT / WORKER) ---
-    # Internal staff bypass the OTP and immediately receive the Golden Ticket
+    # --- IMMEDIATE ACCESS (ADMIN / DEPT / WORKER / SEED ACCOUNTS) ---
+    # Internal staff AND your seed account bypass the OTP and immediately receive the Golden Ticket
     access_token = auth_service.create_access_token(
         data={"sub": str(user.id), "role": user.role}
     )
