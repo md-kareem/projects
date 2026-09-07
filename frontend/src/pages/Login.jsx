@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, Key, Mail, Loader2 } from 'lucide-react';
+import { Shield, Key, Mail, Loader2, Lock, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -7,9 +7,16 @@ function Login() {
   const { login, isLoading } = useAuth();
   const [credentials, setCredentials] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
-  // Updated default state to match the new inclusive tab name
   const [activeTab, setActiveTab] = useState('Citizen/Resident');
   const navigate = useNavigate();
+
+  // 2FA States
+  const [showOTP, setShowOTP] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  
+  // New UI State for Password Visibility
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -27,11 +34,47 @@ function Login() {
 
     const result = await login(credentials);
 
-    if (!result.success) {
+    if (result.require_2fa) {
+      setShowOTP(true);
+      setError('');
+    } else if (!result.success) {
       setError(result.error || 'Authentication protocol failed.');
     } else {
-      // If login is successful, switch the page to the dashboard!
       navigate('/dashboard');
+    }
+  };
+
+  const handleVerifyOTP = async (e) => {
+    e.preventDefault();
+    if (otpCode.length !== 6) {
+      setError('Passcode must be exactly 6 digits.');
+      return;
+    }
+
+    setIsVerifying(true);
+    setError('');
+
+    try {
+      const response = await fetch('http://localhost:8000/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: credentials.email, otp_code: otpCode })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.detail || 'Invalid or expired verification code.');
+        setIsVerifying(false);
+        return;
+      }
+
+      localStorage.setItem('token', data.access_token);
+      window.location.href = '/dashboard';
+
+    } catch (err) {
+      setError('Network error during verification protocol.');
+      setIsVerifying(false);
     }
   };
 
@@ -57,24 +100,6 @@ function Login() {
               Secure Access Terminal
             </p>
           </div>
-          
-          {/* Role Tabs */}
-          <div className="grid grid-cols-2 gap-2 mb-8">
-            {['Citizen/Resident', 'Dept', 'Worker', 'Admin'].map((role) => (
-              <button
-                key={role}
-                type="button"
-                onClick={() => setActiveTab(role)}
-                className={`py-3 px-2 text-[10px] sm:text-xs font-mono uppercase tracking-widest rounded-md transition-all duration-200 border ${
-                  activeTab === role
-                    ? 'bg-zinc-800 text-emerald-400 shadow-sm border-zinc-700/50'
-                    : 'bg-zinc-900/30 text-zinc-500 border-zinc-800/50 hover:text-zinc-300 hover:bg-zinc-800/50'
-                }`}
-              >
-                {role}
-              </button>
-            ))}
-          </div>
 
           {error && (
             <div className="mb-6 p-3 bg-red-950/30 border border-red-900/50 rounded-lg flex items-center gap-2">
@@ -82,85 +107,177 @@ function Login() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="block text-xs font-mono text-zinc-400 mb-2 uppercase tracking-wider">
-                {activeTab === 'Dept' ? 'Department' : activeTab} Official Email
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail size={16} className="text-zinc-600" />
-                </div>
-                <input
-                  type="email"
-                  name="email"
-                  value={credentials.email}
-                  onChange={handleChange}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-10 pr-3 py-3 text-zinc-200 placeholder-zinc-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all outline-none"
-                  placeholder="ID@smartcity.gov" 
-                />
+          {showOTP ? (
+            <div className="animate-in fade-in zoom-in duration-300">
+              <div className="text-center mb-6">
+                <h2 className="text-emerald-400 font-mono text-sm uppercase tracking-widest mb-2">
+                  Identity Verification
+                </h2>
+                <p className="text-zinc-500 text-xs font-mono">
+                  A 6-digit secure code has been routed to<br/>
+                  <span className="text-zinc-300">{credentials.email}</span>
+                </p>
               </div>
-            </div>
 
-            <div>
-              {/* FORGOT PASSWORD ADDITION IS HERE */}
-              <div className="flex justify-between items-center mb-2">
-                <label className="block text-xs font-mono text-zinc-400 uppercase tracking-wider">
-                  Passcode
-                </label>
-                <Link 
-                  to="/forgot-password" 
-                  className="text-[10px] font-mono text-zinc-500 hover:text-emerald-400 transition-colors uppercase tracking-widest"
+              <form onSubmit={handleVerifyOTP} className="space-y-5">
+                <div>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Lock size={16} className="text-zinc-600" />
+                    </div>
+                    <input
+                      type="text"
+                      maxLength="6"
+                      value={otpCode}
+                      onChange={(e) => {
+                        setOtpCode(e.target.value.replace(/\D/g, ''));
+                        setError('');
+                      }}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-10 pr-3 py-4 text-center text-2xl tracking-[0.5em] text-emerald-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all outline-none font-mono"
+                      placeholder="000000"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={isVerifying || otpCode.length !== 6}
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-500 text-zinc-950 font-bold font-mono uppercase tracking-widest py-3.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-3 shadow-[0_0_15px_rgba(16,185,129,0.15)] hover:shadow-[0_0_25px_rgba(16,185,129,0.3)]"
+                  >
+                    {isVerifying ? (
+                      <>
+                        <Loader2 size={18} className="animate-spin" />
+                        Verifying...
+                      </>
+                    ) : (
+                      'Confirm Identity'
+                    )}
+                  </button>
+                </div>
+              </form>
+
+              <div className="mt-6 text-center">
+                <button
+                  onClick={() => {
+                    setShowOTP(false);
+                    setOtpCode('');
+                    setError('');
+                  }}
+                  className="flex items-center justify-center gap-2 w-full text-zinc-500 hover:text-emerald-400 transition-colors text-xs font-mono uppercase tracking-widest"
                 >
-                  Forgot Passcode?
-                </Link>
+                  <ArrowLeft size={14} /> Cancel Protocol
+                </button>
               </div>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Key size={16} className="text-zinc-600" />
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-2 mb-8">
+                {['Citizen/Resident', 'Dept', 'Worker', 'Admin'].map((role) => (
+                  <button
+                    key={role}
+                    type="button"
+                    onClick={() => setActiveTab(role)}
+                    className={`py-3 px-2 text-[10px] sm:text-xs font-mono uppercase tracking-widest rounded-md transition-all duration-200 border ${
+                      activeTab === role
+                        ? 'bg-zinc-800 text-emerald-400 shadow-sm border-zinc-700/50'
+                        : 'bg-zinc-900/30 text-zinc-500 border-zinc-800/50 hover:text-zinc-300 hover:bg-zinc-800/50'
+                    }`}
+                  >
+                    {role}
+                  </button>
+                ))}
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div>
+                  <label className="block text-xs font-mono text-zinc-400 mb-2 uppercase tracking-wider">
+                    {activeTab === 'Dept' ? 'Department' : activeTab} Official Email
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Mail size={16} className="text-zinc-600" />
+                    </div>
+                    <input
+                      type="email"
+                      name="email"
+                      value={credentials.email}
+                      onChange={handleChange}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-10 pr-3 py-3 text-zinc-200 placeholder-zinc-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all outline-none"
+                      placeholder="ID@smartcity.gov" 
+                    />
+                  </div>
                 </div>
-                <input
-                  type="password"
-                  name="password"
-                  value={credentials.password}
-                  onChange={handleChange}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-10 pr-3 py-3 text-zinc-200 placeholder-zinc-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all outline-none"
-                  placeholder="••••••••" 
-                />
-              </div>
-            </div>
 
-            <div className="pt-4">
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-500 text-zinc-950 font-bold font-mono uppercase tracking-widest py-3.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-3 shadow-[0_0_15px_rgba(16,185,129,0.15)] hover:shadow-[0_0_25px_rgba(16,185,129,0.3)]"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 size={18} className="animate-spin" />
-                    Authenticating...
-                  </>
-                ) : (
-                  'Initialize Session'
-                )}
-              </button>
-            </div>
-          </form>
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="block text-xs font-mono text-zinc-400 uppercase tracking-wider">
+                      Passcode
+                    </label>
+                    <Link 
+                      to="/forgot-password" 
+                      className="text-[10px] font-mono text-zinc-500 hover:text-emerald-400 transition-colors uppercase tracking-widest"
+                    >
+                      Forgot Passcode?
+                    </Link>
+                  </div>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Key size={16} className="text-zinc-600" />
+                    </div>
+                    {/* UPDATED PASSWORD INPUT WITH TOGGLE */}
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      name="password"
+                      value={credentials.password}
+                      onChange={handleChange}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-10 pr-10 py-3 text-zinc-200 placeholder-zinc-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all outline-none"
+                      placeholder="••••••••" 
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-500 hover:text-emerald-400 transition-colors"
+                      aria-label="Toggle password visibility"
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
 
-          {/* Dynamic Registration Link */}
-          {activeTab === 'Citizen/Resident' && (
-            <div className="mt-6 text-center">
-              <p className="text-xs font-mono text-zinc-500 uppercase tracking-widest">
-                New to the network?
-              </p>
-              <Link
-                to="/register"
-                className="text-xs font-mono text-emerald-500 hover:text-emerald-400 uppercase tracking-widest mt-1 inline-block border-b border-emerald-500/30 hover:border-emerald-400 pb-0.5 transition-all"
-              >
-                Initiate Citizen/Resident Registration
-              </Link>
-            </div>
+                <div className="pt-4">
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-500 text-zinc-950 font-bold font-mono uppercase tracking-widest py-3.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-3 shadow-[0_0_15px_rgba(16,185,129,0.15)] hover:shadow-[0_0_25px_rgba(16,185,129,0.3)]"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 size={18} className="animate-spin" />
+                        Authenticating...
+                      </>
+                    ) : (
+                      'Initialize Session'
+                    )}
+                  </button>
+                </div>
+              </form>
+
+              {activeTab === 'Citizen/Resident' && (
+                <div className="mt-6 text-center">
+                  <p className="text-xs font-mono text-zinc-500 uppercase tracking-widest">
+                    New to the network?
+                  </p>
+                  <Link
+                    to="/register"
+                    className="text-xs font-mono text-emerald-500 hover:text-emerald-400 uppercase tracking-widest mt-1 inline-block border-b border-emerald-500/30 hover:border-emerald-400 pb-0.5 transition-all"
+                  >
+                    Initiate Citizen/Resident Registration
+                  </Link>
+                </div>
+              )}
+            </>
           )}
 
         </div>

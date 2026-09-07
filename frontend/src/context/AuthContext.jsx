@@ -6,112 +6,110 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 1. Check local storage for an existing session when the app loads
+  // 1. Session check & JWT Decoder on load
   useEffect(() => {
     const storedToken = localStorage.getItem("token");
-    const storedUser = localStorage.getItem("user_data");
+    let storedUser = localStorage.getItem("user_data");
 
-    if (storedToken && storedUser) {
+    if (storedToken) {
       try {
-        setUser(JSON.parse(storedUser));
+        if (storedUser) {
+          setUser(JSON.parse(storedUser));
+        } else {
+          // 2FA flow sets the token but not user_data, so we decode the JWT here!
+          const payloadBase64 = storedToken.split('.')[1];
+          const decodedJson = atob(payloadBase64);
+          const tokenData = JSON.parse(decodedJson);
+
+          const reconstructedUser = {
+            id: tokenData.sub,
+            role: tokenData.role.toLowerCase(),
+            name: "AUTHORIZED_USER",
+          };
+          localStorage.setItem("user_data", JSON.stringify(reconstructedUser));
+          setUser(reconstructedUser);
+        }
       } catch (err) {
-        console.error("Failed to parse stored user profile", err);
+        console.error("Failed to parse token/profile", err);
+        localStorage.removeItem("token");
+        localStorage.removeItem("user_data");
       }
     }
     setIsLoading(false);
   }, []);
 
-  // 2. THE NEW REGISTRATION FUNCTION
+  // 2. THE REGISTRATION FUNCTION (Unchanged)
   const register = async (userData) => {
     setIsLoading(true);
     try {
       const response = await fetch("http://localhost:8000/api/auth/register", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        // We pass the raw JSON data matching your UserCreate schema!
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(userData),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        return {
-          success: false,
-          error: errorData.detail || "Failed to create account.",
-        };
+        return { success: false, error: errorData.detail || "Failed to create account." };
       }
-
-      // If registration works, they can now log in!
       return { success: true };
     } catch (error) {
       console.error("Registration error:", error);
-      return {
-        success: false,
-        error: "Network error connecting to the server.",
-      };
+      return { success: false, error: "Network error connecting to the server." };
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 3. THE REAL SECURE LOGIN FUNCTION
+  // 3. THE 2FA-AWARE LOGIN FUNCTION
   const login = async (credentials) => {
     setIsLoading(true);
     try {
-      // Step A: Translate the data into standard web-form format for FastAPI
       const formData = new URLSearchParams();
       formData.append("username", credentials.email);
       formData.append("password", credentials.password);
 
-      // Step B: Ask the REAL Python backend if the password is correct
       const response = await fetch("http://localhost:8000/api/auth/login", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: formData,
       });
 
-      // Step C: THE VAULT DOOR! If the backend says the password is wrong, WE STOP HERE.
       if (!response.ok) {
         const errorData = await response.json();
-        return {
-          success: false,
-          error: errorData.detail || "Invalid email or password.",
-        };
+        return { success: false, error: errorData.detail || "Invalid email or password." };
       }
 
-      // Step D: The backend approved the password! Save the secure token.
       const data = await response.json();
+
+      // --- THE 2FA INTERCEPTOR ---
+      if (data.require_2fa) {
+        // Stop here and tell Login.jsx to show the OTP screen
+        return { success: true, require_2fa: true, email: data.email };
+      }
+
+      // Fallback: If 2FA is ever disabled, proceed normally
       const token = data.access_token;
       localStorage.setItem("token", token);
 
-      // Step E: Crack open the Golden Ticket (JWT) to read the REAL role!
-      // A JWT has 3 parts separated by dots. The middle part (index 1) holds the data.
       const payloadBase64 = token.split('.')[1];
-      const decodedJson = atob(payloadBase64); // Decode Base64 to text
-      const tokenData = JSON.parse(decodedJson); // Parse text to JSON object
+      const decodedJson = atob(payloadBase64);
+      const tokenData = JSON.parse(decodedJson);
 
-      // Create the final user profile using the exact data from the backend
       const finalUserData = {
-        id: tokenData.sub,             // The user's ID
-        role: tokenData.role.toLowerCase(), // e.g., "citizen", "worker", "admin"
+        id: tokenData.sub,
+        role: tokenData.role.toLowerCase(),
         email: credentials.email,
-        name: credentials.email.split("@")[0].toUpperCase(), // Fallback name display
+        name: credentials.email.split("@")[0].toUpperCase(),
       };
 
-      // Save user profile and update state
       localStorage.setItem("user_data", JSON.stringify(finalUserData));
       setUser(finalUserData);
 
       return { success: true, role: finalUserData.role };
     } catch (error) {
       console.error("Login error:", error);
-      return {
-        success: false,
-        error: "Network error connecting to the server.",
-      };
+      return { success: false, error: "Network error connecting to the server." };
     } finally {
       setIsLoading(false);
     }

@@ -7,12 +7,9 @@ import { useAuth } from '../context/AuthContext';
 
 const CitizenDashboard = () => {
   const { user } = useAuth();
-
-  // 1. Start with an empty vault instead of fake data
   const [myComplaints, setMyComplaints] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 2. The Data Fetcher: Runs automatically when the page loads!
   useEffect(() => {
     const fetchRealLogs = async () => {
       try {
@@ -28,7 +25,6 @@ const CitizenDashboard = () => {
         
         const dbData = await response.json();
 
-        // 3. Translate the Database words into Frontend words
         const formattedData = dbData.map(dbItem => ({
           id: dbItem.id,
           title: dbItem.title,
@@ -40,7 +36,6 @@ const CitizenDashboard = () => {
           image_url: dbItem.image_url
         }));
 
-        // Put the newest complaints at the top!
         const sortedData = formattedData.sort((a, b) => b.id - a.id);
         
         setMyComplaints(sortedData);
@@ -52,11 +47,9 @@ const CitizenDashboard = () => {
     };
 
     fetchRealLogs();
-  }, []); // The empty brackets [] mean "run this once when the page opens"
+  }, []);
 
-  // 4. Update the live UI when a new form is submitted
   const handleNewSubmission = (savedComplaint) => {
-    // Translate the single new record coming straight from the ComplaintForm
     const formattedNewReport = {
       id: savedComplaint.id,
       title: savedComplaint.title,
@@ -68,7 +61,6 @@ const CitizenDashboard = () => {
       image_url: savedComplaint.image_url || null
     };
 
-    // Add it to the top of the UI instantly
     setMyComplaints((prevComplaints) => [formattedNewReport, ...prevComplaints]);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -128,7 +120,6 @@ const CitizenDashboard = () => {
 
               <div className="flex flex-col gap-4 max-h-[800px] overflow-y-auto pr-2 custom-scrollbar">
                 
-                {/* Show a spinner while fetching from Python */}
                 {isLoading ? (
                    <div className="flex items-center justify-center p-10 text-emerald-500">
                      <Loader2 className="animate-spin" size={32} />

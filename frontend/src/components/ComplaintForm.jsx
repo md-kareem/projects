@@ -2,29 +2,8 @@ import React, { useState } from 'react';
 import { UploadCloud, MapPin, AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-// Leaflet Maps for GPS Selection
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-import icon from 'leaflet/dist/images/marker-icon.png';
-import iconShadow from 'leaflet/dist/images/marker-shadow.png';
-
-let DefaultIcon = L.icon({
-  iconUrl: icon,
-  shadowUrl: iconShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41]
-});
-L.Marker.prototype.options.icon = DefaultIcon;
-
-const LocationPicker = ({ position, setPosition }) => {
-  useMapEvents({
-    click(e) {
-      setPosition(e.latlng);
-    },
-  });
-  return position === null ? null : <Marker position={position}></Marker>;
-};
+// Import your newly upgraded Smart Map!
+import MapComponent from './MapComponent'; 
 
 const ComplaintForm = ({ onSubmit }) => {
   const { user } = useAuth();
@@ -106,17 +85,13 @@ const ComplaintForm = ({ onSubmit }) => {
       // ==========================================
       const token = localStorage.getItem('token');
       
-      // We removed the local severity calculation because your Python backend 
-      // is now handling it brilliantly with the Hugging Face AI!
-
-      // THE FIX: Perfecting the payload to match your backend schema exactly
       const payload = {
         title: formData.title,
         description: formData.description,
         category: formData.category,
         location_lat: position.lat,
         location_lng: position.lng,
-        address: `GPS: ${position.lat.toFixed(4)}, ${position.lng.toFixed(4)}`, // Gives the dashboard a location string
+        address: `GPS: ${position.lat.toFixed(4)}, ${position.lng.toFixed(4)}`, 
         image_url: finalImageUrl 
       };
 
@@ -136,7 +111,6 @@ const ComplaintForm = ({ onSubmit }) => {
 
       const savedComplaint = await response.json();
       
-      // Pass the fully saved database object back to the parent component
       if (onSubmit) {
         onSubmit(savedComplaint);
       }
@@ -229,25 +203,22 @@ const ComplaintForm = ({ onSubmit }) => {
             <label className="text-xs font-mono text-zinc-400 uppercase tracking-widest flex items-center gap-2">
               Incident Location <span className="text-amber-500">*Click Map*</span>
             </label>
-            <div className="h-[200px] rounded-lg border border-zinc-800 overflow-hidden relative z-0">
-              <MapContainer 
-                center={[12.9716, 77.5946]} 
-                zoom={12} 
-                style={{ height: '100%', width: '100%' }}
-              >
-                <TileLayer
-                  url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-                  attribution='&copy; CARTO'
-                />
-                <LocationPicker position={position} setPosition={setPosition} />
-              </MapContainer>
+            
+            {/* FIX: Removed the 'relative z-0' classes that were trapping the fullscreen expansion */}
+            <div className="h-[300px]">
+              <MapComponent 
+                isPicker={true} 
+                complaintLocation={position || { lat: 12.9716, lng: 77.5946 }} // Defaults to Bengaluru
+                onLocationSelect={setPosition} 
+              />
             </div>
+            
           </div>
 
           <div className="space-y-1">
             <label className="text-xs font-mono text-zinc-400 uppercase tracking-widest">Attach Evidence (Optional)</label>
             <div 
-              className="h-[200px] border-2 border-dashed border-zinc-700 rounded-lg bg-zinc-950 hover:bg-zinc-900/50 hover:border-amber-500/50 transition-all flex flex-col items-center justify-center cursor-pointer relative overflow-hidden group"
+              className="h-[300px] border-2 border-dashed border-zinc-700 rounded-lg bg-zinc-950 hover:bg-zinc-900/50 hover:border-amber-500/50 transition-all flex flex-col items-center justify-center cursor-pointer relative overflow-hidden group"
               onDragOver={(e) => e.preventDefault()}
               onDrop={handleImageDrop}
               onClick={() => document.getElementById('file-upload').click()}
