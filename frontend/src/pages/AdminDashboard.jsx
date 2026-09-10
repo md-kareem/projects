@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Activity, AlertOctagon, CheckCircle, Clock, MapPin, Navigation } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import ComplaintCard from "../components/ComplaintCard";
@@ -56,37 +56,69 @@ const AdminDashboard = () => {
   const queryParams = new URLSearchParams(location.search);
   const currentView = queryParams.get("view") || "overview";
 
-  // Mock statistics for the top dashboard row
+  // --- LIVE BACKEND INTEGRATION ---
+  const [complaints, setComplaints] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchComplaints = async () => {
+      try {
+        // Grab the auth token from local storage (adjust if you store it differently)
+        const token = localStorage.getItem("token") || localStorage.getItem("access_token");
+        
+        const response = await fetch("http://127.0.0.1:8000/complaints/", {
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setComplaints(data);
+        } else {
+          console.error("Failed to fetch live database reports.");
+        }
+      } catch (error) {
+        console.error("Network error fetching complaints:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchComplaints();
+  }, []);
+
+  // --- DYNAMIC STATISTICS ENGINE ---
+  // These boxes now calculate automatically based on the live database!
   const stats = [
-    { label: "Active Reports", value: "142", icon: Activity, color: "text-emerald-500" },
-    { label: "Critical Priority", value: "18", icon: AlertOctagon, color: "text-red-500" },
-    { label: "Pending Review", value: "45", icon: Clock, color: "text-amber-500" },
-    { label: "Resolved (7d)", value: "89", icon: CheckCircle, color: "text-blue-500" },
-  ];
-
-  // Mock complaints
-  const mockComplaints = [
-    {
-      id: 1,
-      title: "Major Pothole on M.G. Road",
-      description: "Large pothole causing traffic buildup.",
-      location: "M.G. Road, Block 4",
-      date: "2 hours ago",
-      priority: "high",
-      status: "Pending",
+    { 
+      label: "Active Reports", 
+      value: complaints.length.toString(), 
+      icon: Activity, 
+      color: "text-emerald-500" 
     },
-    {
-      id: 2,
-      title: "Streetlight Malfunction",
-      description: "Entire block is pitch dark.",
-      location: "7th Cross, Indiranagar",
-      date: "5 hours ago",
-      priority: "medium",
-      status: "In Progress",
+    { 
+      label: "Critical Priority", 
+      value: complaints.filter(c => (c.priority || "").toLowerCase() === "high" || (c.severity || "").toLowerCase() === "high").length.toString(), 
+      icon: AlertOctagon, 
+      color: "text-red-500" 
+    },
+    { 
+      label: "Pending Review", 
+      value: complaints.filter(c => ["pending", "open", "submitted"].includes((c.status || "").toLowerCase())).length.toString(), 
+      icon: Clock, 
+      color: "text-amber-500" 
+    },
+    { 
+      label: "Resolved", 
+      value: complaints.filter(c => (c.status || "").toLowerCase() === "resolved").length.toString(), 
+      icon: CheckCircle, 
+      color: "text-blue-500" 
     },
   ];
 
-  // Mock Fleet Workers for the map
+  // Mock Fleet Workers for the map (To be connected to live DB in Phase 9)
   const mockFleet = [
     { id: 1, name: "Unit 42-ALPHA", lat: 12.9716, lng: 77.5946, status: "Active - Heavy Repair" },
     { id: 2, name: "Unit 07-BRAVO", lat: 12.965, lng: 77.605, status: "Idle - Inspection" },
@@ -142,7 +174,6 @@ const AdminDashboard = () => {
                     attribution='&copy; OpenStreetMap contributors'
                   />
                   
-                  {/* The new GPS Button */}
                   <LocateControl />
 
                   {/* Plot the Field Workers */}
@@ -187,14 +218,27 @@ const AdminDashboard = () => {
                 <div className="flex items-center justify-between">
                   <h2 className="text-xl font-bold text-zinc-100 uppercase tracking-wide flex items-center gap-2">
                     <Activity className="text-emerald-500" size={20} />
-                    Recent Submissions
+                    Live Submissions
                   </h2>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {mockComplaints.map((complaint) => (
-                    <ComplaintCard key={complaint.id} complaint={complaint} />
-                  ))}
-                </div>
+                
+                {isLoading ? (
+                  <div className="text-zinc-500 font-mono text-center py-10 animate-pulse">
+                    Decrypting Database Stream...
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {complaints.length === 0 ? (
+                      <div className="col-span-full text-zinc-500 font-mono text-center py-10">
+                        No active reports found in the network.
+                      </div>
+                    ) : (
+                      complaints.map((complaint) => (
+                        <ComplaintCard key={complaint.id} complaint={complaint} />
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}

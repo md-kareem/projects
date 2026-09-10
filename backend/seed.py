@@ -3,14 +3,21 @@ from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 
 from app.db.database import SessionLocal, engine, Base
+
+# 1. CRITICAL: Import ALL models before calling create_all() so SQLAlchemy sees the relationships
 from app.models.user import User
 from app.models.complaint import Complaint
-from app.models.department import Department
-from app.models.assignment import Assignment
-from app.models.feedback import Feedback
-from app.models.resolution import Resolution
+# Updated to import from our new Phase 4 file!
+from app.models.jurisdiction import Municipality, Department 
+
+# If you have these other models built, you can uncomment them:
+# from app.models.assignment import Assignment
+# from app.models.feedback import Feedback
+# from app.models.resolution import Resolution
 
 # Rebuild all database tables based on your models
+print("🧹 Dropping old tables and resetting database for Phase 4...")
+Base.metadata.drop_all(bind=engine)
 Base.metadata.create_all(bind=engine)
 
 # Set up the password hasher (bcrypt)
@@ -25,36 +32,48 @@ def seed_database():
     
     try:
         # ---------------------------------------------------------
-        # 1. SEED USERS (Role-Based Access Control)
+        # 1. SEED JURISDICTIONS (Phase 4 Hierarchy)
+        # ---------------------------------------------------------
+        print("\n🏢 Building Municipalities (Zones)...")
+        zone_south = Municipality(name="Bengaluru South Zone", description="South district jurisdiction")
+        db.add(zone_south)
+        
+        print("🚦 Building Departments...")
+        dept_roads = Department(name="Roads & Infrastructure", description="Handles potholes, roads, and bridges")
+        db.add(dept_roads)
+        
+        db.commit()
+        db.refresh(zone_south)
+        db.refresh(dept_roads)
+
+        # ---------------------------------------------------------
+        # 2. SEED USERS (Role-Based Access Control)
         # ---------------------------------------------------------
         test_users = [
-            {"email": "admin@smartcity.com", "full_name": "Admin User", "password": "password123", "role": "Admin"},
-            {"email": "official@smartcity.com", "full_name": "City Official", "password": "password123", "role": "Official"},
-            {"email": "worker@smartcity.com", "full_name": "Field Worker", "password": "password123", "role": "Worker"},
-            {"email": "citizen@smartcity.com", "full_name": "Local Citizen", "password": "password123", "role": "Citizen"},
+            {"email": "admin@smartcity.com", "full_name": "Admin User", "password": "password123", "role": "admin", "mun_id": None, "dep_id": None},
+            # Official and Worker get assigned to the specific zone and department!
+            {"email": "official@smartcity.com", "full_name": "City Official", "password": "password123", "role": "official", "mun_id": zone_south.id, "dep_id": dept_roads.id},
+            {"email": "worker@smartcity.com", "full_name": "Field Worker", "password": "password123", "role": "worker", "mun_id": zone_south.id, "dep_id": dept_roads.id},
+            {"email": "citizen@smartcity.com", "full_name": "Local Citizen", "password": "password123", "role": "citizen", "mun_id": None, "dep_id": None},
         ]
 
         # Dictionary to store created users so we can link complaints to them
         created_users = {}
 
-        print("Seeding users...")
+        print("\n👥 Seeding users...")
         for user_data in test_users:
-            # Check if user already exists to make the script idempotent
             existing_user = db.query(User).filter(User.email == user_data["email"]).first()
-
-            # We use .get() here to safely grab the name, defaulting to "System User" if missing
-            display_name = user_data.get("full_name") or user_data.get("username") or "System User"
-    
-            # Hash the exact 11-character string "password123"
+            display_name = user_data.get("full_name") or "System User"
             safe_hash = get_password_hash(user_data["password"])
 
             if not existing_user:
-                # User does not exist, create a brand new one
                 new_user = User(
                     email=user_data["email"],
                     full_name=display_name,
                     hashed_password=safe_hash,
-                    role=user_data["role"]
+                    role=user_data["role"],
+                    municipality_id=user_data["mun_id"], # Phase 4 connection
+                    department_id=user_data["dep_id"]    # Phase 4 connection
                 )
                 db.add(new_user)
                 db.commit()
@@ -62,12 +81,12 @@ def seed_database():
                 created_users[user_data["role"]] = new_user
                 print(f"  [+] Created {user_data['role']}: {user_data['email']}")
                 
-            else: # <--- FIXED INDENTATION: Now aligned perfectly with the 'if' statement!
-                # User exists, but might have corrupted data. 
-                # Force the database to overwrite the old passcode with the new safe_hash!
+            else:
                 existing_user.hashed_password = safe_hash
                 existing_user.full_name = display_name
                 existing_user.role = user_data["role"]
+                existing_user.municipality_id = user_data["mun_id"]
+                existing_user.department_id = user_data["dep_id"]
         
                 db.commit()
                 db.refresh(existing_user)
@@ -75,39 +94,45 @@ def seed_database():
                 print(f"  [*] Repaired & Updated {user_data['role']}: {user_data['email']}")
 
         # ---------------------------------------------------------
-        # 2. SEED COMPLAINTS (AI Triage Examples)
+        # 3. SEED COMPLAINTS (AI Triage Examples)
         # ---------------------------------------------------------
-        # We assign these to the Citizen we just created
-        citizen_id = created_users["Citizen"].id
+        citizen_id = created_users["citizen"].id
 
         test_complaints = [
             {
                 "title": "Massive pothole on 5th Avenue",
                 "description": "There is a deep pothole in the right lane causing traffic slowdowns and vehicle damage.",
-                "category": "Infrastructure",      # AI Classification mock
-                "severity": "High",                # AI Classification mock
+                "category": "Roads & Infrastructure", # Updated to match department perfectly     
+                "severity": "High",                
                 "status": "Open",
-                "user_id": citizen_id              # Updated to match backend expectations
+                "user_id": citizen_id,
+                "municipality_id": zone_south.id,  
+                "department_id": dept_roads.id,
+                
+                # --- NEW: ADDING GPS DATA SO THE ENGINE CAN FIND IT ---
+                "location_lat": 12.9716, 
+                "location_lng": 77.5946,
+                "address": "Central Bengaluru"
             },
             {
                 "title": "Broken streetlights in park",
                 "description": "Three consecutive streetlights are out in the north end of the city park, creating a safety hazard.",
-                "category": "Electrical",          # AI Classification mock
-                "severity": "Medium",              # AI Classification mock
+                "category": "Electrical",          
+                "severity": "Medium",              
                 "status": "Assigned",
-                "user_id": citizen_id              # Updated to match backend expectations
+                "user_id": citizen_id              
             },
             {
                 "title": "Graffiti on bus stop",
                 "description": "Someone spray-painted the glass at the main street bus shelter.",
-                "category": "Vandalism",           # AI Classification mock
-                "severity": "Low",                 # AI Classification mock
+                "category": "Vandalism",           
+                "severity": "Low",                 
                 "status": "Resolved",
-                "user_id": citizen_id              # Updated to match backend expectations
+                "user_id": citizen_id              
             }
         ]
 
-        print("\nSeeding complaints...")
+        print("\n📝 Seeding complaints...")
         for complaint_data in test_complaints:
             existing_complaint = db.query(Complaint).filter(Complaint.title == complaint_data["title"]).first()
             if not existing_complaint:
@@ -118,10 +143,10 @@ def seed_database():
                 print(f"  [-] Complaint '{complaint_data['title']}' already exists, skipping.")
         
         db.commit()
-        print("\nDatabase seeding completed successfully!")
+        print("\n✅ Phase 4 Database Seeding Completed Successfully!")
 
     except Exception as e:
-        print(f"\nAn error occurred during seeding: {e}")
+        print(f"\n❌ An error occurred during seeding: {e}")
         db.rollback()
     finally:
         db.close()

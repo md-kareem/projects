@@ -6,6 +6,7 @@ from typing import List
 from app.db.database import SessionLocal
 from app.models.complaint import Complaint
 from app.models.user import User
+from app.models.jurisdiction import Department, Municipality 
 from app.api.auth import get_current_user
 from app.schemas.complaint_schema import ComplaintCreate, ComplaintResponse
 from app.services.ai_service import analyze_complaint_severity
@@ -21,16 +22,13 @@ def get_db():
 
 # --- HAVERSINE SPATIAL ENGINE ---
 def calculate_distance(lat1, lon1, lat2, lon2):
-    """Calculates the great-circle distance in meters between two GPS coordinates."""
-    R = 6371000  # Radius of Earth in meters
+    R = 6371000  
     phi1, phi2 = math.radians(lat1), math.radians(lat2)
     delta_phi = math.radians(lat2 - lat1)
     delta_lambda = math.radians(lon2 - lon1)
-
     a = math.sin(delta_phi / 2.0) ** 2 + \
         math.cos(phi1) * math.cos(phi2) * \
         math.sin(delta_lambda / 2.0) ** 2
-    
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
 
@@ -40,17 +38,35 @@ def create_complaint(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user) 
 ):
-    print("--- NEW CITIZEN REPORT RECEIVED ---")
+    print(f"--- NEW REPORT RECEIVED: Frontend sent '{complaint.category}' ---")
     
-    # 1. SPATIAL DEDUPLICATION (Look for existing Master Tickets)
+    # --- BUG FIX 1: SMART DEPARTMENT ROUTING ---
+    # Try to find a partial match (e.g. "Infrastructure" matches "Roads & Infrastructure")
+    matched_dept = db.query(Department).filter(
+        Department.name.ilike(f"%{complaint.category}%")
+    ).first()
+
+    # THE SAFETY NET: If the frontend sends "General" or misses, force it to our test department!
+    if not matched_dept:
+        print("⚠️ Exact category not found, auto-correcting to Roads Department!")
+        matched_dept = db.query(Department).filter(Department.name.ilike("%Roads%")).first()
+        complaint.category = "Roads & Infrastructure" # Auto-correct the string
+
+    dept_id = matched_dept.id if matched_dept else None
+
+    # Default to Bengaluru South Zone 
+    default_zone = db.query(Municipality).filter(Municipality.name == "Bengaluru South Zone").first()
+    mun_id = default_zone.id if default_zone else None
+
+    # --- BUG FIX 2: CLUSTER BY DEPARTMENT ID, NOT FRAGILE TEXT ---
     master_id = None
     if complaint.location_lat and complaint.location_lng:
         
-        # Pull active master tickets in the same category
+        # Now we only check if they belong to the same department!
         active_masters = db.query(Complaint).filter(
-            Complaint.category == complaint.category,
+            Complaint.department_id == dept_id,
             Complaint.parent_id == None,
-            Complaint.status.in_(["Pending", "Submitted", "Assigned"])
+            Complaint.status.in_(["Pending", "Submitted", "Assigned", "Open"])
         ).all()
 
         for master in active_masters:
@@ -60,21 +76,16 @@ def create_complaint(
                     master.location_lat, master.location_lng
                 )
                 
-                # If within 50 meters, we have a cluster!
                 if distance <= 50: 
                     print(f"⚠️ CLUSTER MATCH! Found identical incident #{master.id} just {int(distance)}m away.")
                     master.report_count += 1
                     master_id = master.id
-                    db.commit() # Save the incremented count on the master ticket
-                    break # Stop searching, we found our cluster
+                    db.commit() 
+                    break 
 
-    # 2. Wake up the AI! Pass the citizen's description to Hugging Face
     description_text = complaint.description 
-    print("Asking AI to analyze severity...")
     ai_calculated_severity = analyze_complaint_severity(description_text)
-    print(f"AI returned severity: {ai_calculated_severity}")
 
-    # 3. Save to the database
     new_complaint = Complaint(
         title=complaint.title,
         description=description_text,
@@ -83,10 +94,12 @@ def create_complaint(
         location_lat=getattr(complaint, 'location_lat', None), 
         location_lng=getattr(complaint, 'location_lng', None),
         severity=ai_calculated_severity,  
-        status="Pending",
+        status="Open",
         user_id=current_user.id, 
         image_url=complaint.image_url,
-        parent_id=master_id # If a match was found, this safely hides the new ticket as a child!
+        parent_id=master_id,
+        department_id=dept_id,      
+        municipality_id=mun_id      
     )
     
     db.add(new_complaint)
@@ -101,10 +114,34 @@ def read_complaints(
     current_user: User = Depends(get_current_user)
 ):
     if current_user.role.lower() == "citizen":
-        # Citizens can see ALL their own reports to track personal history
         complaints = db.query(Complaint).filter(Complaint.user_id == current_user.id).all()
+    elif current_user.role.lower() in ["official", "worker"]:
+        complaints = db.query(Complaint).filter(
+            Complaint.parent_id == None,
+            Complaint.municipality_id == current_user.municipality_id,
+            Complaint.department_id == current_user.department_id
+        ).all()
     else:
-        # DEPARTMENTS/ADMINS: Filter out the duplicates! Only show Master Tickets.
         complaints = db.query(Complaint).filter(Complaint.parent_id == None).all()
         
     return complaints
+
+@router.post("/{complaint_id}/status")
+def update_complaint_status(
+    complaint_id: int, 
+    status: str, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Find the specific complaint
+    complaint = db.query(Complaint).filter(Complaint.id == complaint_id).first()
+    
+    if not complaint:
+        raise HTTPException(status_code=404, detail="Complaint not found")
+        
+    # Update the status
+    complaint.status = status
+    db.commit()
+    db.refresh(complaint)
+    
+    return {"message": f"Task {complaint_id} marked as {status}", "status": status}

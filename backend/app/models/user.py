@@ -20,6 +20,10 @@ class User(Base):
     # Role-Based Access Control (e.g., "Citizen", "Admin", "Worker", "Official")
     role = Column(String, default="Citizen", index=True, nullable=False)
     
+    # --- PHASE 4: HIERARCHICAL RBAC (Role-Based Access Control) ---
+    # Zone link (Applicable for Officials and Field Workers to limit their jurisdiction)
+    municipality_id = Column(Integer, ForeignKey("municipalities.id"), nullable=True)
+    
     # Department link (Applicable only for Officials and Field Workers)
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
     
@@ -31,6 +35,7 @@ class User(Base):
     # Relationships 
     # ---------------------------------------------------------
     # department = relationship("Department", back_populates="users")
+    # municipality = relationship("Municipality") # Uncomment when needed
     # complaints_submitted = relationship("Complaint", foreign_keys="[Complaint.user_id]", back_populates="user")
     # complaints_assigned = relationship("Complaint", foreign_keys="[Complaint.worker_id]", back_populates="worker")
     # assignments = relationship("Assignment", back_populates="worker")

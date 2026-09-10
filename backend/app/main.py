@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # 1. IMPORT ALL MODELS FIRST: This forces SQLAlchemy to read all tables into memory at once!
 from app.models.user import User
 from app.models.complaint import Complaint
-from app.models.department import Department
+from app.models import jurisdiction
 from app.models.assignment import Assignment
 from app.models.feedback import Feedback
 from app.models.resolution import Resolution

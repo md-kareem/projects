@@ -30,9 +30,20 @@ class ComplaintResponse(ComplaintBase):
     id: int
     category: str
     status: str
+    
+    # UI Badge Fields
+    severity: Optional[str] = None
+    priority: Optional[str] = "Medium"
+    
     image_url: Optional[str] = None
     user_id: int
+    
+    # --- PHASE 4 HIERARCHY & CLUSTERING DATA ---
     department_id: Optional[int] = None
+    municipality_id: Optional[int] = None
+    parent_id: Optional[int] = None
+    report_count: int = 1
+    
     worker_id: Optional[int] = None
     
     created_at: datetime

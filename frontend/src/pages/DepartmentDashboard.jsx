@@ -8,7 +8,7 @@ import {
   Truck,
   Loader2,
   MapPin,
-  Navigation // Imported for the GPS button
+  Navigation 
 } from "lucide-react";
 import ComplaintCard from "../components/ComplaintCard";
 import Sidebar from "../components/Sidebar";
@@ -16,7 +16,7 @@ import { useAuth } from "../context/AuthContext";
 
 // Leaflet Map Imports
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
-import "leaflet/dist/leaflet.css"; // Fixed: Moved to its own line
+import "leaflet/dist/leaflet.css"; 
 import L from "leaflet";
 
 // Fix for default Leaflet marker icons in React
@@ -33,7 +33,7 @@ let DefaultIcon = L.icon({
 L.Marker.prototype.options.icon = DefaultIcon;
 
 // ==========================================
-// NEW: Custom GPS Locate Component
+// Custom GPS Locate Component
 // ==========================================
 const LocateControl = () => {
   const map = useMap();
@@ -42,9 +42,8 @@ const LocateControl = () => {
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition((position) => {
         const { latitude, longitude } = position.coords;
-        // Smoothly fly the map to the user's GPS coordinates
         map.flyTo([latitude, longitude], 14, {
-          duration: 1.5 // 1.5 seconds animation
+          duration: 1.5 
         });
       }, () => {
         alert("GPS access denied or unavailable.");
@@ -82,7 +81,6 @@ const DepartmentDashboard = () => {
   // Default Map Center (Bengaluru)
   const defaultCenter = [12.9716, 77.5946];
 
-  // 1. Fetch the real, live complaints when the dashboard opens
   useEffect(() => {
     fetchRealLogs();
   }, []);
@@ -99,17 +97,20 @@ const DepartmentDashboard = () => {
 
       const dbData = await response.json();
 
-      // Translate backend data to frontend UI format, NOW INCLUDING GPS!
+      // --- CRITICAL FIX: Properly map the Phase 4 variables to the UI ---
       const formattedData = dbData.map((dbItem) => ({
         id: dbItem.id,
         title: dbItem.title,
         description: dbItem.description,
+        category: dbItem.category || "General",                // Phase 4: Added Category
         location: dbItem.address || "Location pending GPS",
-        lat: dbItem.latitude, 
-        lng: dbItem.longitude, 
+        lat: dbItem.location_lat,                              // Fixed: Changed from latitude
+        lng: dbItem.location_lng,                              // Fixed: Changed from longitude
         date: "Recently",
-        priority: dbItem.severity?.toLowerCase() || "medium",
+        priority: dbItem.priority || dbItem.severity?.toLowerCase() || "medium",
         status: dbItem.status || "Pending",
+        image_url: dbItem.image_url,                           // Phase 4: Added Image support
+        report_count: dbItem.report_count || 1                 // Phase 4: Added Cluster count
       }));
 
       // Sort newest at the top
@@ -139,16 +140,15 @@ const DepartmentDashboard = () => {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        },
+        }
       );
 
       if (!response.ok) throw new Error("Failed to dispatch unit.");
 
-      // Success! Instantly update the UI to show it's Assigned
       setDepartmentTasks((prevTasks) =>
         prevTasks.map((task) =>
-          task.id === taskId ? { ...task, status: "Assigned" } : task,
-        ),
+          task.id === taskId ? { ...task, status: "Assigned" } : task
+        )
       );
 
       setDispatchingTaskId(null);
@@ -161,7 +161,6 @@ const DepartmentDashboard = () => {
     }
   };
 
-  // Filter logic
   const filteredTasks = departmentTasks.filter((task) => {
     if (activeFilter === "All") return true;
 
@@ -183,7 +182,6 @@ const DepartmentDashboard = () => {
         <div className="absolute top-[-10%] right-[-5%] w-[40%] h-[40%] bg-blue-900/10 blur-[120px] rounded-full pointer-events-none"></div>
 
         <div className="max-w-7xl mx-auto space-y-8 relative z-10">
-          {/* Header */}
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-zinc-800 pb-6">
             <div className="flex items-center gap-4">
               <div className="p-3 bg-zinc-900 border border-zinc-700 rounded-xl text-blue-500 shadow-inner">
@@ -207,7 +205,6 @@ const DepartmentDashboard = () => {
             </div>
           </div>
 
-          {/* Filter Bar */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 vault-card p-4 rounded-xl border border-zinc-800 bg-zinc-900/50">
             <div className="flex items-center gap-2 text-zinc-400 font-mono text-sm uppercase tracking-wider mb-2 sm:mb-0">
               <Filter size={16} />
@@ -237,7 +234,6 @@ const DepartmentDashboard = () => {
             </div>
           ) : (
             <>
-              {/* THE NEW MASTER TACTICAL MAP */}
               <div className="w-full h-[400px] bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden shadow-2xl relative">
                 <div className="absolute top-4 right-4 z-[400] bg-zinc-950/90 border border-zinc-800 px-3 py-2 rounded-lg backdrop-blur-md pointer-events-none">
                   <p className="text-xs font-mono text-blue-400 uppercase tracking-widest flex items-center gap-2">
@@ -250,16 +246,13 @@ const DepartmentDashboard = () => {
                   zoom={12}
                   style={{ height: "100%", width: "100%", zIndex: 1 }}
                 >
-                  {/* Fixed: Brought back the Dark Matter theme! */}
                   <TileLayer
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     attribution='&copy; OpenStreetMap contributors'
                   />
 
-                  {/* Added the GPS Locate Button */}
                   <LocateControl />
 
-                  {/* Plot only tasks that have GPS data and match the current filter */}
                   {filteredTasks
                     .filter((t) => t.lat && t.lng)
                     .map((task) => (
@@ -283,7 +276,6 @@ const DepartmentDashboard = () => {
                               <button
                                 onClick={() => {
                                   setDispatchingTaskId(task.id);
-                                  // Scroll down to the grid where the dispatch UI is open
                                   window.scrollTo({
                                     top: document.body.scrollHeight,
                                     behavior: "smooth",
@@ -301,7 +293,6 @@ const DepartmentDashboard = () => {
                 </MapContainer>
               </div>
 
-              {/* Task Grid Header */}
               <div className="flex items-center gap-3 border-b border-zinc-800/80 pb-2 mt-8">
                 <h2 className="text-lg font-bold text-zinc-200 uppercase tracking-wide">
                   {activeFilter} Assignments
@@ -311,7 +302,6 @@ const DepartmentDashboard = () => {
                 </span>
               </div>
 
-              {/* Existing Task Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
                 {filteredTasks.map((task) => (
                   <div
@@ -320,9 +310,9 @@ const DepartmentDashboard = () => {
                   >
                     <ComplaintCard complaint={task} />
 
-                    {/* Dispatch Options UI */}
                     {(task.status.toLowerCase().includes("pending") ||
-                      task.status.toLowerCase().includes("submitted")) && (
+                      task.status.toLowerCase().includes("submitted") ||
+                      task.status.toLowerCase().includes("open")) && (
                       <div className="mt-2">
                         {dispatchingTaskId === task.id ? (
                           <div className="p-4 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl flex flex-col gap-3 animate-in fade-in slide-in-from-top-2">
@@ -338,7 +328,6 @@ const DepartmentDashboard = () => {
                               }
                             >
                               <option value="">-- Select Field Unit --</option>
-                              {/* Hardcoded units for now */}
                               <option value="2">
                                 Unit 42-ALPHA (Heavy Repair)
                               </option>

@@ -1,8 +1,5 @@
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
 from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
-
-# Import the Base class from database.py
 from app.db.database import Base
 
 class Complaint(Base):
@@ -13,39 +10,31 @@ class Complaint(Base):
     description = Column(String, nullable=False)
     severity = Column(String, default="Unclassified")
     
-    # Location data for mapping the issues
+    # Location data
     location_lat = Column(Float, nullable=True)
     location_lng = Column(Float, nullable=True)
     address = Column(String, nullable=True)
-    
-    # Media evidence
     image_url = Column(String, nullable=True)
     
-    # Categorization, tracking, and AI Triage
+    # Status & Triage
     category = Column(String, index=True, nullable=False) 
     status = Column(String, default="Submitted", index=True) 
     priority = Column(String, default="Medium", index=True) 
     
-    # --- PHASE 3: INCIDENT CLUSTERING ENGINE ---
-    parent_id = Column(Integer, ForeignKey("complaints.id"), nullable=True) # Links duplicates to a Master
-    report_count = Column(Integer, default=1) # Tracks how many citizens reported this
+    # Clustering Engine
+    parent_id = Column(Integer, ForeignKey("complaints.id"), nullable=True) 
+    report_count = Column(Integer, default=1) 
 
-    # Foreign Keys linking to other tables
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    # --- PHASE 4: HIERARCHICAL ROUTING ---
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False) # The Citizen who reported it
+    
+    # The Backend will auto-fill these based on GPS (Municipality) and Category (Department)
+    municipality_id = Column(Integer, ForeignKey("municipalities.id"), nullable=True)
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
+    
+    # The specific worker assigned to fix the issue (Assigned by the Officer)
     worker_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     
-    # Timestamps to track the lifecycle of the complaint
+    # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-    # ---------------------------------------------------------
-    # Relationships 
-    # ---------------------------------------------------------
-    # user = relationship("User", foreign_keys=[user_id], back_populates="complaints_submitted")
-    # worker = relationship("User", foreign_keys=[worker_id], back_populates="complaints_assigned")
-    # department = relationship("Department", back_populates="complaints")
-    # assignments = relationship("Assignment", back_populates="complaint")
-    
-    # Self-referential relationship for easy access to clustered duplicates
-    # children = relationship("Complaint", backref="parent", remote_side=[id])
