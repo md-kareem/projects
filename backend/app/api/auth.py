@@ -16,6 +16,10 @@ from app.schemas.user_schema import UserCreate, UserResponse, Token
 from app.services import auth as auth_service
 from app.services import email_service
 
+import random
+from pydantic import BaseModel
+
+
 router = APIRouter(
     prefix="/api/auth",
     tags=["Authentication"]
@@ -160,3 +164,58 @@ def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
         "access_token": access_token,
         "token_type": "bearer"
     }
+
+import random
+from pydantic import BaseModel
+
+# Temporary in-memory vault for OTPs. 
+# (In a production environment, you would use Redis or save this to the User database model with an expiration timestamp)
+otp_vault = {} 
+
+class PasswordRecoveryRequest(BaseModel):
+    email: str
+
+class OTPVerifyRequest(BaseModel):
+    email: str
+    otp: str
+
+@router.post("/forgot-password")
+def forgot_password(request: PasswordRecoveryRequest, db: Session = Depends(get_db)):
+    # 1. Check if the user exists
+    user = db.query(User).filter(User.email == request.email).first()
+    
+    if user:
+        # 2. Generate a secure 6-digit code
+        otp = str(random.randint(100000, 999999))
+        
+        # 3. Store it in our vault attached to their email
+        otp_vault[request.email] = otp
+        
+        # 4. SIMULATE SENDING THE EMAIL (Check your terminal!)
+        print("\n" + "="*50)
+        print(f"📧 SECURE EMAIL DISPATCHED TO: {request.email}")
+        print(f"🔑 IDENTITY VERIFICATION CODE: {otp}")
+        print("="*50 + "\n")
+    
+    # SECURITY BEST PRACTICE: 
+    # We always return a success message even if the email doesn't exist. 
+    # This prevents hackers from using this form to guess which emails are registered!
+    return {"message": "Protocol Dispatched"}
+
+
+@router.post("/verify-otp")
+def verify_otp(request: OTPVerifyRequest):
+    # 1. Retrieve the OTP for this email
+    valid_otp = otp_vault.get(request.email)
+    
+    # 2. Check if it matches
+    if valid_otp and valid_otp == request.otp:
+        # Success! Remove the OTP from the vault so it can't be reused
+        del otp_vault[request.email]
+        return {"message": "Identity Verified", "status": "success"}
+    
+    # 3. If it fails, throw an error
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED, 
+        detail="Invalid or expired secure code."
+    )

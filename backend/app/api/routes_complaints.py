@@ -10,6 +10,12 @@ from app.models.jurisdiction import Department, Municipality
 from app.api.auth import get_current_user
 from app.schemas.complaint_schema import ComplaintCreate, ComplaintResponse
 from app.services.ai_service import analyze_complaint_severity
+from pydantic import BaseModel
+from typing import Optional
+
+class AIPredictRequest(BaseModel):
+    description: str
+    image_url: Optional[str] = None
 
 router = APIRouter()
 
@@ -40,17 +46,27 @@ def create_complaint(
 ):
     print(f"--- NEW REPORT RECEIVED: Frontend sent '{complaint.category}' ---")
     
-    # --- BUG FIX 1: SMART DEPARTMENT ROUTING ---
-    # Try to find a partial match (e.g. "Infrastructure" matches "Roads & Infrastructure")
+    # --- BUG FIX 1: SMART DEPARTMENT ROUTING TRANSLATOR ---
+    # We extract a short, safe keyword to search the database with, 
+    # so we don't fail if the frontend sends a long string like "Other / Unclassified"
+    search_keyword = complaint.category.split(" ")[0] # Grabs the first word (e.g., "Roads", "Water")
+    
+    if "Other" in complaint.category or "Unclassified" in complaint.category:
+        search_keyword = "General"
+    elif "Vandalism" in complaint.category or "Safety" in complaint.category:
+        search_keyword = "Safety" # Or "Vandalism" depending on your DB
+        
+    # Try to find a partial match in the Database using the short keyword
     matched_dept = db.query(Department).filter(
-        Department.name.ilike(f"%{complaint.category}%")
+        Department.name.ilike(f"%{search_keyword}%")
     ).first()
 
-    # THE SAFETY NET: If the frontend sends "General" or misses, force it to our test department!
+    # THE SAFETY NET: If it STILL fails to find a department, we assign it to Roads ID,
+    # BUT we do NOT overwrite the 'complaint.category' string anymore!
     if not matched_dept:
-        print("⚠️ Exact category not found, auto-correcting to Roads Department!")
+        print(f"⚠️ Exact DB department for '{search_keyword}' not found. Routing to default department.")
         matched_dept = db.query(Department).filter(Department.name.ilike("%Roads%")).first()
-        complaint.category = "Roads & Infrastructure" # Auto-correct the string
+        # WE REMOVED THE LINE THAT WAS OVERWRITING YOUR CATEGORY HERE!
 
     dept_id = matched_dept.id if matched_dept else None
 
@@ -89,7 +105,7 @@ def create_complaint(
     new_complaint = Complaint(
         title=complaint.title,
         description=description_text,
-        category=complaint.category, 
+        category=complaint.category, # This will now safely remain exactly what the frontend sent!
         address=getattr(complaint, 'address', getattr(complaint, 'location', "Location pending GPS")),
         location_lat=getattr(complaint, 'location_lat', None), 
         location_lng=getattr(complaint, 'location_lng', None),
@@ -115,6 +131,24 @@ def read_complaints(
 ):
     if current_user.role.lower() == "citizen":
         complaints = db.query(Complaint).filter(Complaint.user_id == current_user.id).all()
+        
+        # --- DATABASE AUTO-HEALER FOR STALE DATA ---
+        # This catches any tickets that got stuck before we added the cascade fix!
+        has_changes = False
+        for c in complaints:
+            if c.parent_id is not None:
+                # Find the master ticket this child belongs to
+                master = db.query(Complaint).filter(Complaint.id == c.parent_id).first()
+                # If the master moved on without the child, sync them up!
+                if master and c.status != master.status:
+                    print(f"🔧 Auto-Healing Citizen Ticket #{c.id} to match Master status: {master.status}")
+                    c.status = master.status
+                    has_changes = True
+        
+        # Commit the fixes to the database permanently
+        if has_changes:
+            db.commit()
+            
     elif current_user.role.lower() in ["official", "worker"]:
         complaints = db.query(Complaint).filter(
             Complaint.parent_id == None,
@@ -133,15 +167,55 @@ def update_complaint_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Find the specific complaint
+    # Find the specific master complaint
     complaint = db.query(Complaint).filter(Complaint.id == complaint_id).first()
     
     if not complaint:
         raise HTTPException(status_code=404, detail="Complaint not found")
         
-    # Update the status
+    # 1. Update the status of the Master Ticket
     complaint.status = status
+    
+    # 2. BUG FIX: Cascade the status update to ALL duplicate Child Tickets!
+    child_complaints = db.query(Complaint).filter(Complaint.parent_id == complaint_id).all()
+    for child in child_complaints:
+        child.status = status
+        
     db.commit()
     db.refresh(complaint)
     
-    return {"message": f"Task {complaint_id} marked as {status}", "status": status}
+    return {
+        "message": f"Task {complaint_id} and {len(child_complaints)} duplicate(s) marked as {status}", 
+        "status": status
+    }
+
+@router.post("/predict-category")
+def predict_ticket_category(request: AIPredictRequest):
+    print(f"🧠 AI Analyzing Context: '{request.description}'")
+    if request.image_url:
+        print("📸 AI Vision: Image data detected in payload.")
+
+    text = request.description.lower()
+    
+    # 1. ROADS & INFRASTRUCTURE
+    if any(word in text for word in ["pothole", "sinkhole", "road", "street", "crack", "asphalt", "sidewalk", "bridge"]):
+        predicted_category = "Roads & Infrastructure"
+        
+    # 2. ELECTRICAL & LIGHTING
+    elif any(word in text for word in ["light", "power", "wire", "pole", "electricity", "dark", "spark"]):
+        predicted_category = "Electrical & Lighting"
+        
+    # 3. WATER & SANITATION
+    elif any(word in text for word in ["water", "pipe", "leak", "flood", "drain", "sewer", "trash", "garbage"]):
+        predicted_category = "Water & Sanitation"
+        
+    # 4. VANDALISM & SAFETY
+    elif any(word in text for word in ["graffiti", "paint", "glass", "broken", "vandalism", "damage"]):
+        predicted_category = "Vandalism"
+        
+    # 5. FALLBACK
+    else:
+        predicted_category = "General"
+
+    print(f"🎯 AI Prediction Complete: Routing to {predicted_category}")
+    return {"predicted_category": predicted_category}
