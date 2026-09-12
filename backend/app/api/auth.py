@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 import jwt
+import random
 
 # Import database dependency
 from app.db.database import get_db
@@ -16,9 +17,6 @@ from app.schemas.user_schema import UserCreate, UserResponse, Token
 from app.services import auth as auth_service
 from app.services import email_service
 
-import random
-from pydantic import BaseModel
-
 
 router = APIRouter(
     prefix="/api/auth",
@@ -28,8 +26,7 @@ router = APIRouter(
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 # ---------------------------------------------------------
-# MVP OTP Storage (In-Memory Dictionary)
-# In production, this moves to Redis or a Database table
+# 2FA LOGIN OTP STORAGE
 # ---------------------------------------------------------
 OTP_STORE = {}
 
@@ -86,9 +83,6 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login")
 def login_user(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    """
-    Verifies credentials. Forces 2FA for Citizens, bypasses 2FA for internal staff and test accounts.
-    """
     user = db.query(User).filter(User.email == form_data.username).first()
     
     if not user or not auth_service.verify_password(form_data.password, user.hashed_password):
@@ -99,7 +93,6 @@ def login_user(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = D
         )
         
     # --- 2FA INTERCEPTOR (CITIZENS ONLY) ---
-    # FIX: We explicitly bypass 2FA for your fake seed account!
     if user.role.lower() == "citizen" and user.email != "citizen@smartcity.com":
         otp_code = email_service.generate_otp()
         
@@ -108,10 +101,7 @@ def login_user(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = D
             "expires_at": datetime.utcnow() + timedelta(minutes=5)
         }
         
-        # PRO-TIP: Print the OTP to your backend terminal! 
-        # If you ever use another fake email, you can just read the code here.
         print(f"--- ⚠️ DEV MODE: Generated OTP for {user.email} is {otp_code} ---")
-        
         email_service.send_otp_email(user.email, otp_code)
         
         return {
@@ -120,8 +110,7 @@ def login_user(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = D
             "email": user.email
         }
 
-    # --- IMMEDIATE ACCESS (ADMIN / DEPT / WORKER / SEED ACCOUNTS) ---
-    # Internal staff AND your seed account bypass the OTP and immediately receive the Golden Ticket
+    # --- IMMEDIATE ACCESS ---
     access_token = auth_service.create_access_token(
         data={"sub": str(user.id), "role": user.role}
     )
@@ -134,27 +123,21 @@ def login_user(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = D
 
 @router.post("/verify-otp", response_model=Token)
 def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
-    """
-    Step 2 of 2FA: Validates the 6-digit code and releases the JWT Access Token.
-    """
+    """Step 2 of 2FA Login"""
     stored_data = OTP_STORE.get(request.email)
     
     if not stored_data:
         raise HTTPException(status_code=400, detail="OTP expired or no active request found.")
         
-    # Enforce the 5-minute expiration rule
     if datetime.utcnow() > stored_data["expires_at"]:
         del OTP_STORE[request.email]
         raise HTTPException(status_code=400, detail="OTP has expired. Please log in again.")
         
-    # Validate the code
     if stored_data["code"] != request.otp_code:
         raise HTTPException(status_code=401, detail="Invalid verification code.")
         
-    # Code is valid! Clean up the store to prevent reuse
     del OTP_STORE[request.email]
     
-    # Mint and release the Golden Ticket (JWT)
     user = db.query(User).filter(User.email == request.email).first()
     access_token = auth_service.create_access_token(
         data={"sub": str(user.id), "role": user.role}
@@ -165,57 +148,69 @@ def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
         "token_type": "bearer"
     }
 
-import random
-from pydantic import BaseModel
 
-# Temporary in-memory vault for OTPs. 
-# (In a production environment, you would use Redis or save this to the User database model with an expiration timestamp)
+# ---------------------------------------------------------
+# PASSWORD RECOVERY SYSTEM
+# ---------------------------------------------------------
 otp_vault = {} 
 
 class PasswordRecoveryRequest(BaseModel):
     email: str
 
-class OTPVerifyRequest(BaseModel):
+# RENAMED to avoid clashing with 2FA Login schema
+class RecoveryOTPVerifyRequest(BaseModel):
     email: str
     otp: str
 
 @router.post("/forgot-password")
 def forgot_password(request: PasswordRecoveryRequest, db: Session = Depends(get_db)):
-    # 1. Check if the user exists
     user = db.query(User).filter(User.email == request.email).first()
     
     if user:
-        # 2. Generate a secure 6-digit code
-        otp = str(random.randint(100000, 999999))
+        # 1. Use your existing email service to generate the code
+        otp = email_service.generate_otp()
         
-        # 3. Store it in our vault attached to their email
+        # 2. Store it in the vault
         otp_vault[request.email] = otp
         
-        # 4. SIMULATE SENDING THE EMAIL (Check your terminal!)
-        print("\n" + "="*50)
-        print(f"📧 SECURE EMAIL DISPATCHED TO: {request.email}")
-        print(f"🔑 IDENTITY VERIFICATION CODE: {otp}")
-        print("="*50 + "\n")
+        # 3. DISPATCH THE REAL EMAIL!
+        print(f"--- ⚠️ DEV MODE: Generated Password Recovery OTP for {user.email} is {otp} ---")
+        try:
+            # Re-using the exact same function that works for your 2FA!
+            email_service.send_otp_email(user.email, otp)
+            print(f"--- OTP securely routed to {request.email} ---")
+        except Exception as e:
+            print(f"🚨 Email Delivery Failed: {str(e)}")
     
-    # SECURITY BEST PRACTICE: 
-    # We always return a success message even if the email doesn't exist. 
-    # This prevents hackers from using this form to guess which emails are registered!
     return {"message": "Protocol Dispatched"}
 
+# RENAMED route to avoid clashing with 2FA Login route
+class PasswordResetRequest(BaseModel):
+    email: str
+    otp: str
+    new_password: str
 
-@router.post("/verify-otp")
-def verify_otp(request: OTPVerifyRequest):
-    # 1. Retrieve the OTP for this email
+@router.post("/reset-password")
+def reset_password(request: PasswordResetRequest, db: Session = Depends(get_db)):
+    # 1. Verify the OTP is correct
     valid_otp = otp_vault.get(request.email)
     
-    # 2. Check if it matches
-    if valid_otp and valid_otp == request.otp:
-        # Success! Remove the OTP from the vault so it can't be reused
-        del otp_vault[request.email]
-        return {"message": "Identity Verified", "status": "success"}
+    if not valid_otp or valid_otp != request.otp:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Invalid or expired secure code."
+        )
+        
+    # 2. Find the user in the database
+    user = db.query(User).filter(User.email == request.email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found in registry.")
+        
+    # 3. Hash the new password and save it
+    user.hashed_password = auth_service.get_password_hash(request.new_password)
+    db.commit()
     
-    # 3. If it fails, throw an error
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED, 
-        detail="Invalid or expired secure code."
-    )
+    # 4. Clean up the OTP vault so the code can't be reused
+    del otp_vault[request.email]
+    
+    return {"message": "Passcode successfully updated", "status": "success"}
