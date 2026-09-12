@@ -112,7 +112,7 @@ def login_user(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = D
 
     # --- IMMEDIATE ACCESS ---
     access_token = auth_service.create_access_token(
-        data={"sub": str(user.id), "role": user.role}
+        data={"sub": str(user.id), "role": user.role, "full_name": user.full_name}
     )
     
     return {
@@ -140,7 +140,7 @@ def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
     
     user = db.query(User).filter(User.email == request.email).first()
     access_token = auth_service.create_access_token(
-        data={"sub": str(user.id), "role": user.role}
+        data={"sub": str(user.id), "role": user.role, "full_name": user.full_name}
     )
     
     return {

@@ -24,8 +24,11 @@ export const AuthProvider = ({ children }) => {
           const reconstructedUser = {
             id: tokenData.sub,
             role: tokenData.role.toLowerCase(),
-            name: "AUTHORIZED_USER",
+            // BUG FIX: Pulling the actual name from the token instead of hardcoding it!
+            name: tokenData.full_name || "AUTHORIZED_USER",
+            full_name: tokenData.full_name 
           };
+          
           localStorage.setItem("user_data", JSON.stringify(reconstructedUser));
           setUser(reconstructedUser);
         }
@@ -38,7 +41,7 @@ export const AuthProvider = ({ children }) => {
     setIsLoading(false);
   }, []);
 
-  // 2. THE REGISTRATION FUNCTION (Unchanged)
+  // 2. THE REGISTRATION FUNCTION
   const register = async (userData) => {
     setIsLoading(true);
     try {
@@ -84,11 +87,10 @@ export const AuthProvider = ({ children }) => {
 
       // --- THE 2FA INTERCEPTOR ---
       if (data.require_2fa) {
-        // Stop here and tell Login.jsx to show the OTP screen
         return { success: true, require_2fa: true, email: data.email };
       }
 
-      // Fallback: If 2FA is ever disabled, proceed normally
+      // Fallback: If 2FA is ever bypassed (Admins/Workers), proceed normally
       const token = data.access_token;
       localStorage.setItem("token", token);
 
@@ -100,7 +102,9 @@ export const AuthProvider = ({ children }) => {
         id: tokenData.sub,
         role: tokenData.role.toLowerCase(),
         email: credentials.email,
-        name: credentials.email.split("@")[0].toUpperCase(),
+        // BUG FIX: Pulling the actual name from the token!
+        name: tokenData.full_name || credentials.email.split("@")[0].toUpperCase(),
+        full_name: tokenData.full_name
       };
 
       localStorage.setItem("user_data", JSON.stringify(finalUserData));
