@@ -1,11 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { CheckCircle, Truck, Wrench, Loader2, Navigation, AlertOctagon, Camera, X, Upload } from "lucide-react";
+import { useLocation } from "react-router-dom"; // <-- ADDED MISSING IMPORT
 import ComplaintCard from "../components/ComplaintCard";
 import Sidebar from "../components/Sidebar";
 import { useAuth } from "../context/AuthContext";
+import EditProfile from '../components/EditProfile';
 
 const WorkerDashboard = () => {
   const { user } = useAuth();
+  
+  // --- ADDED: READ THE URL ---
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const currentView = queryParams.get("view") || "tasks";
+
   const [assignments, setAssignments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("Active"); 
@@ -123,6 +131,7 @@ const WorkerDashboard = () => {
 
         <div className="max-w-4xl mx-auto space-y-6 relative z-10">
           
+          {/* Header */}
           <div className="flex flex-col gap-4 border-b border-zinc-800 pb-6 mt-4 md:mt-0">
             <div className="flex items-center gap-4">
               <div className="p-3 bg-zinc-900 border border-zinc-700 rounded-xl text-emerald-500 shadow-inner">
@@ -133,75 +142,91 @@ const WorkerDashboard = () => {
                   Field <span className="text-emerald-500">Unit</span>
                 </h1>
                 <p className="text-xs font-mono text-zinc-400 mt-1">
-                  UNIT ID: {user?.name?.toUpperCase() || "ALPHA-42"} // ACTIVE DISPATCH
+                  UNIT ID: {user?.name?.toUpperCase() || "ALPHA-42"} 
+                  {currentView === 'settings' ? " // IDENTITY MANAGEMENT" : " // ACTIVE DISPATCH"}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="flex gap-2 bg-zinc-900/50 p-1 rounded-lg border border-zinc-800">
-            <button
-              onClick={() => setActiveTab("Active")}
-              className={`flex-1 py-3 text-xs md:text-sm font-mono uppercase tracking-widest rounded-md transition-all flex items-center justify-center gap-2 ${
-                activeTab === "Active"
-                  ? "bg-zinc-800 text-zinc-100 shadow-md border border-zinc-700"
-                  : "text-zinc-500 hover:text-zinc-300"
-              }`}
-            >
-              <AlertOctagon size={16} /> Active Tasks
-            </button>
-            <button
-              onClick={() => setActiveTab("Resolved")}
-              className={`flex-1 py-3 text-xs md:text-sm font-mono uppercase tracking-widest rounded-md transition-all flex items-center justify-center gap-2 ${
-                activeTab === "Resolved"
-                  ? "bg-zinc-800 text-emerald-400 shadow-md border border-zinc-700"
-                  : "text-zinc-500 hover:text-zinc-300"
-              }`}
-            >
-              <CheckCircle size={16} /> Resolved
-            </button>
-          </div>
-
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center p-20 text-emerald-500 gap-4">
-              <Loader2 className="animate-spin" size={40} />
-              <p className="font-mono text-sm uppercase tracking-widest text-zinc-500">Syncing with dispatch...</p>
+          {/* DYNAMIC INTERCEPTOR */}
+          {currentView === "settings" ? (
+            /* VIEW 1: SETTINGS / PROFILE EDITOR */
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <EditProfile />
             </div>
           ) : (
-            <div className="flex flex-col gap-6">
-              {filteredAssignments.length === 0 ? (
-                <div className="p-12 text-center border-2 border-dashed border-zinc-800 rounded-xl bg-zinc-900/20">
-                  <p className="text-zinc-500 font-mono text-sm uppercase tracking-widest">
-                    No {activeTab.toLowerCase()} assignments.
-                  </p>
+            /* VIEW 2: STANDARD FIELD UNIT DASHBOARD */
+            <div className="space-y-6 animate-in fade-in duration-300">
+              
+              {/* Tabs */}
+              <div className="flex gap-2 bg-zinc-900/50 p-1 rounded-lg border border-zinc-800">
+                <button
+                  onClick={() => setActiveTab("Active")}
+                  className={`flex-1 py-3 text-xs md:text-sm font-mono uppercase tracking-widest rounded-md transition-all flex items-center justify-center gap-2 ${
+                    activeTab === "Active"
+                      ? "bg-zinc-800 text-zinc-100 shadow-md border border-zinc-700"
+                      : "text-zinc-500 hover:text-zinc-300"
+                  }`}
+                >
+                  <AlertOctagon size={16} /> Active Tasks
+                </button>
+                <button
+                  onClick={() => setActiveTab("Resolved")}
+                  className={`flex-1 py-3 text-xs md:text-sm font-mono uppercase tracking-widest rounded-md transition-all flex items-center justify-center gap-2 ${
+                    activeTab === "Resolved"
+                      ? "bg-zinc-800 text-emerald-400 shadow-md border border-zinc-700"
+                      : "text-zinc-500 hover:text-zinc-300"
+                  }`}
+                >
+                  <CheckCircle size={16} /> Resolved
+                </button>
+              </div>
+
+              {/* Assignments List */}
+              {isLoading ? (
+                <div className="flex flex-col items-center justify-center p-20 text-emerald-500 gap-4">
+                  <Loader2 className="animate-spin" size={40} />
+                  <p className="font-mono text-sm uppercase tracking-widest text-zinc-500">Syncing with dispatch...</p>
                 </div>
               ) : (
-                filteredAssignments.map((task) => (
-                  <div key={task.id} className="relative group flex flex-col h-full animate-in fade-in slide-in-from-bottom-4">
-                    <ComplaintCard complaint={task} />
-
-                    <div className="mt-2 flex flex-col sm:flex-row gap-2">
-                      <button 
-                        onClick={() => openInOSM(task.lat, task.lng)}
-                        className="flex-1 bg-zinc-900 border border-zinc-800 hover:border-blue-500/50 hover:bg-blue-950/30 text-zinc-300 hover:text-blue-400 py-4 rounded-lg font-mono text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg"
-                      >
-                        <Navigation size={16} /> Navigate
-                      </button>
-
-                      {task.status.toLowerCase() !== "resolved" && (
-                        <button 
-                          onClick={() => setResolvingTaskId(task.id)}
-                          className="flex-[2] bg-emerald-600/90 hover:bg-emerald-500 border border-emerald-500/50 text-white py-4 rounded-lg font-mono text-xs font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.2)]"
-                        >
-                          <Camera size={16} /> Upload Proof & Resolve
-                        </button>
-                      )}
+                <div className="flex flex-col gap-6">
+                  {filteredAssignments.length === 0 ? (
+                    <div className="p-12 text-center border-2 border-dashed border-zinc-800 rounded-xl bg-zinc-900/20">
+                      <p className="text-zinc-500 font-mono text-sm uppercase tracking-widest">
+                        No {activeTab.toLowerCase()} assignments.
+                      </p>
                     </div>
-                  </div>
-                ))
+                  ) : (
+                    filteredAssignments.map((task) => (
+                      <div key={task.id} className="relative group flex flex-col h-full animate-in fade-in slide-in-from-bottom-4">
+                        <ComplaintCard complaint={task} />
+
+                        <div className="mt-2 flex flex-col sm:flex-row gap-2">
+                          <button 
+                            onClick={() => openInOSM(task.lat, task.lng)}
+                            className="flex-1 bg-zinc-900 border border-zinc-800 hover:border-blue-500/50 hover:bg-blue-950/30 text-zinc-300 hover:text-blue-400 py-4 rounded-lg font-mono text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg"
+                          >
+                            <Navigation size={16} /> Navigate
+                          </button>
+
+                          {task.status.toLowerCase() !== "resolved" && (
+                            <button 
+                              onClick={() => setResolvingTaskId(task.id)}
+                              className="flex-[2] bg-emerald-600/90 hover:bg-emerald-500 border border-emerald-500/50 text-white py-4 rounded-lg font-mono text-xs font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                            >
+                              <Camera size={16} /> Upload Proof & Resolve
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               )}
             </div>
           )}
+
         </div>
       </main>
 

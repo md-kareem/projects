@@ -12,6 +12,8 @@ import ComplaintForm from "../components/ComplaintForm";
 import ComplaintCard from "../components/ComplaintCard";
 import Sidebar from "../components/Sidebar";
 import { useAuth } from "../context/AuthContext";
+import EditProfile from '../components/EditProfile';
+
 
 const CitizenDashboard = () => {
   const { user } = useAuth();
@@ -24,7 +26,7 @@ const CitizenDashboard = () => {
   const [myComplaints, setMyComplaints] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // NEW: State for toggling between Active logs and the Resolution Archive
+  // State for toggling between Active logs and the Resolution Archive
   const [logTab, setLogTab] = useState("Active");
 
   // FETCH ALL EXISTING LOGS FROM DATABASE
@@ -117,6 +119,8 @@ const CitizenDashboard = () => {
         <div className="absolute top-[-10%] right-[-5%] w-[40%] h-[40%] bg-emerald-900/10 blur-[120px] rounded-full pointer-events-none"></div>
 
         <div className="max-w-6xl mx-auto space-y-8 relative z-10">
+          
+          {/* HEADER */}
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-zinc-800 pb-6">
             <div className="flex items-center gap-4">
               <div className="p-3 bg-zinc-900 border border-zinc-700 rounded-xl text-emerald-500 shadow-inner">
@@ -132,6 +136,7 @@ const CitizenDashboard = () => {
                   {user?.full_name
                     ? user.full_name.toUpperCase()
                     : "AUTHORIZED_USER"}
+                  {currentView === 'settings' && " // IDENTITY MANAGEMENT"}
                 </p>
               </div>
             </div>
@@ -148,8 +153,13 @@ const CitizenDashboard = () => {
           </div>
 
           {/* DYNAMIC VIEW SWITCHER */}
-          {currentView === "report" ? (
-            /* VIEW 1: INITIATE NEW REPORT */
+          {currentView === "settings" ? (
+            /* VIEW 1: SETTINGS / PROFILE EDITOR */
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <EditProfile />
+            </div>
+          ) : currentView === "report" ? (
+            /* VIEW 2: INITIATE NEW REPORT */
             <div className="space-y-4 animate-in fade-in duration-300 max-w-4xl">
               <div className="flex items-center gap-2 mb-2">
                 <Zap size={18} className="text-amber-500" />
@@ -160,7 +170,7 @@ const CitizenDashboard = () => {
               <ComplaintForm onSubmit={handleNewSubmission} />
             </div>
           ) : (
-            /* VIEW 2: MY LOGS (Active & Archive) */
+            /* VIEW 3: MY LOGS (Active & Archive) */
             <div className="space-y-6 animate-in fade-in duration-300">
               {/* TABS NAVIGATION */}
               <div className="flex flex-col gap-4">

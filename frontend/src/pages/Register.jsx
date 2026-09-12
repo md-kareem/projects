@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, User, Mail, Key, Phone, MapPin, Globe, AlertCircle, Loader2, ArrowLeft } from 'lucide-react';
+import { Shield, User, Mail, Key, Phone, MapPin, Globe, AlertCircle, Loader2, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -24,6 +24,10 @@ const Register = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+
+  // Password Visibility States
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Determines if the regional fields should be unlocked
   const isIndia = formData.country.trim().toLowerCase() === 'india';
@@ -170,26 +174,46 @@ const Register = () => {
 
                     <div>
                       <label className="block text-[10px] font-mono text-zinc-500 mb-1 uppercase tracking-wider">Secure Passcode</label>
-                      <input
-                        type="password"
-                        name="password"
-                        value={formData.password}
-                        onChange={handleChange}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2.5 text-zinc-200 placeholder-zinc-700 focus:border-emerald-500 outline-none transition-all text-sm"
-                        placeholder="••••••••" 
-                      />
+                      <div className="relative group">
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          name="password"
+                          value={formData.password}
+                          onChange={handleChange}
+                          className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-3 pr-10 py-2.5 text-zinc-200 placeholder-zinc-700 focus:border-emerald-500 outline-none transition-all text-sm"
+                          placeholder="••••••••" 
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-600 hover:text-emerald-400 transition-colors"
+                          aria-label="Toggle password visibility"
+                        >
+                          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
                     </div>
 
                     <div>
                       <label className="block text-[10px] font-mono text-zinc-500 mb-1 uppercase tracking-wider">Confirm Passcode</label>
-                      <input
-                        type="password"
-                        name="confirmPassword"
-                        value={formData.confirmPassword}
-                        onChange={handleChange}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2.5 text-zinc-200 placeholder-zinc-700 focus:border-emerald-500 outline-none transition-all text-sm"
-                        placeholder="••••••••" 
-                      />
+                      <div className="relative group">
+                        <input
+                          type={showConfirmPassword ? "text" : "password"}
+                          name="confirmPassword"
+                          value={formData.confirmPassword}
+                          onChange={handleChange}
+                          className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-3 pr-10 py-2.5 text-zinc-200 placeholder-zinc-700 focus:border-emerald-500 outline-none transition-all text-sm"
+                          placeholder="••••••••" 
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-600 hover:text-emerald-400 transition-colors"
+                          aria-label="Toggle confirm password visibility"
+                        >
+                          {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
