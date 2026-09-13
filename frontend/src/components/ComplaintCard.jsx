@@ -1,5 +1,28 @@
 import React, { useState } from 'react';
-import { MapPin, Clock, Camera, X, Users, AlertTriangle, Layers } from 'lucide-react';
+import { MapPin, Clock, Camera, X, Users, AlertTriangle, Layers, Calendar } from 'lucide-react';
+
+// 1. Upgraded Helper function to separate Date and Time for better UI display
+const formatTimestamp = (isoString) => {
+  if (!isoString) return { date: "UNAVAILABLE", time: "--:--" };
+  if (isoString === "Just now") return { date: "TODAY", time: "JUST NOW" }; 
+  
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return { date: isoString, time: "" };
+    
+    const dateStr = new Intl.DateTimeFormat('en-GB', {
+      day: '2-digit', month: 'short', year: 'numeric'
+    }).format(d);
+    
+    const timeStr = new Intl.DateTimeFormat('en-GB', {
+      hour: '2-digit', minute: '2-digit', hour12: true
+    }).format(d);
+
+    return { date: dateStr, time: timeStr };
+  } catch (e) {
+    return { date: isoString, time: "" };
+  }
+};
 
 const ComplaintCard = ({ complaint }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -9,6 +32,7 @@ const ComplaintCard = ({ complaint }) => {
     description = "No description provided.", 
     location = "Location pending GPS", 
     date = "Just now", 
+    created_at = null, // Extracted from your database payload
     priority = "low", 
     status = "Pending",
     image_url = null,
@@ -26,6 +50,7 @@ const ComplaintCard = ({ complaint }) => {
   };
 
   const isCluster = report_count > 1;
+  const timeInfo = formatTimestamp(created_at || date);
 
   return (
     <>
@@ -57,9 +82,7 @@ const ComplaintCard = ({ complaint }) => {
             {description}
           </p>
 
-          {/* ==========================================
-              PHASE 4: INCIDENT CLUSTER WARNING BADGE
-              ========================================== */}
+          {/* CLUSTER WARNING BADGE */}
           {isCluster && (
             <div className="flex items-center gap-2 mb-5 bg-gradient-to-r from-rose-950/40 to-transparent border-l-2 border-rose-500 text-rose-400 px-3 py-2 text-xs font-bold tracking-wide w-fit relative overflow-hidden transition-all duration-300 group-hover:from-rose-950/60">
               <AlertTriangle size={14} className="animate-pulse drop-shadow-[0_0_5px_rgba(225,29,72,0.8)]" />
@@ -87,22 +110,16 @@ const ComplaintCard = ({ complaint }) => {
             </div>
           )}
 
-          {/* Location and Time Data */}
+          {/* Location Data */}
           <div className="flex flex-col gap-2.5 text-xs font-mono text-zinc-500 mt-auto bg-zinc-950/30 p-3 rounded-lg border border-zinc-800/50">
-            <div className="flex items-center gap-2">
-              <MapPin size={14} className="text-emerald-500/70 shrink-0" />
-              <span className="truncate group-hover:text-zinc-400 transition-colors">{location || "Location pending GPS"}</span>
-            </div>
-            
-            <div className="flex items-center gap-2 justify-between">
-              <div className="flex items-center gap-2">
-                <Clock size={14} className="text-emerald-500/70 shrink-0" />
-                <span className="group-hover:text-zinc-400 transition-colors">{date}</span>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 overflow-hidden">
+                <MapPin size={14} className="text-emerald-500/70 shrink-0" />
+                <span className="truncate group-hover:text-zinc-400 transition-colors">{location || "Location pending GPS"}</span>
               </div>
               
-              {/* Subtle Single Report Indicator if not clustered */}
               {!isCluster && (
-                <div className="flex items-center gap-1.5 text-zinc-600 bg-zinc-900 px-2 py-0.5 rounded-full border border-zinc-800">
+                <div className="flex items-center gap-1.5 text-zinc-600 bg-zinc-900 px-2 py-0.5 rounded-full border border-zinc-800 shrink-0">
                   <Users size={10} />
                   <span className="text-[10px]">1 Report</span>
                 </div>
@@ -111,20 +128,38 @@ const ComplaintCard = ({ complaint }) => {
           </div>
         </div>
 
-        {/* Status Footer */}
-        <div className="mt-5 pt-4 border-t border-zinc-800/50 flex items-center justify-between transition-colors group-hover:border-zinc-700/50">
-          <span className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">
-            Status / Action
-          </span>
-          <span className={`text-[10px] px-2.5 py-1 rounded-md font-mono font-bold uppercase tracking-wider border shadow-sm transition-colors ${
-            status.toLowerCase() === 'resolved' 
-              ? 'bg-emerald-950/50 text-emerald-400 border-emerald-900/50' 
-              : status.toLowerCase() === 'assigned'
-              ? 'bg-blue-950/50 text-blue-400 border-blue-900/50'
-              : 'bg-amber-950/30 text-amber-500 border-amber-900/30'
-          }`}>
-            {status}
-          </span>
+        {/* 2. Integrated Time & Status Footer */}
+        <div className="mt-4 pt-4 border-t border-zinc-800/80 flex justify-between items-end transition-colors group-hover:border-zinc-700/50">
+          
+          {/* UPGRADED DATE & TIME DISPLAY FOR WORKERS/DEPT */}
+          <div className="flex flex-col">
+            <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest mb-1.5 flex items-center gap-1">
+              <Calendar size={10} /> Registered At
+            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-mono text-zinc-300 font-bold uppercase tracking-widest bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800 shadow-inner">
+                {timeInfo.date}
+              </span>
+              <span className="text-[10px] font-mono text-emerald-500 font-bold uppercase tracking-widest flex items-center gap-1">
+                <Clock size={10} /> {timeInfo.time}
+              </span>
+            </div>
+          </div>
+          
+          <div className="flex flex-col items-end">
+            <span className="text-[8px] uppercase tracking-widest font-bold text-zinc-600 mb-1.5">
+              Status / Action
+            </span>
+            <span className={`text-[10px] px-2.5 py-1 rounded-md font-mono font-bold uppercase tracking-wider border shadow-sm transition-colors ${
+              status.toLowerCase() === 'resolved' 
+                ? 'bg-emerald-950/50 text-emerald-400 border-emerald-900/50' 
+                : status.toLowerCase() === 'assigned'
+                ? 'bg-blue-950/50 text-blue-400 border-blue-900/50'
+                : 'bg-amber-950/30 text-amber-500 border-amber-900/30'
+            }`}>
+              {status}
+            </span>
+          </div>
         </div>
       </div>
 

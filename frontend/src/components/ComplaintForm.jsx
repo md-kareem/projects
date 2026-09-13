@@ -35,57 +35,60 @@ const ComplaintForm = ({ onSubmit }) => {
     }
   };
 
-  // ==========================================
-  // NEW: THE AI TO DATABASE TRANSLATOR
-  // Maps AI predictions to EXACT Dropdown Values
-  // ==========================================
-  const mapAICategoryToSystem = (aiCategory) => {
-    const categoryMap = {
-      "Roads & Infrastructure": "Roads & Infrastructure",
-      "Electrical & Lighting": "Electrical & Lighting",
-      "Water & Sanitation": "Water & Sanitation",
-      "Vandalism": "Vandalism & Safety",
-      "General": "Other / Unclassified" // Fixes the Auto-Routing Bug!
-    };
-    return categoryMap[aiCategory] || aiCategory;
-  };
-
-  const handleAutoDetect = async () => {
-    if (!formData.description) {
-      setError('System Alert: Please provide a detailed description first so the AI has context to analyze.');
-      return;
-    }
-
+  const handleAutoDetect = () => {
     setIsAnalyzing(true);
-    setError('');
+    
+    setTimeout(() => {
+      // Combine title and description, convert to lowercase for matching
+      const text = `${formData.title} ${formData.description}`.toLowerCase();
 
-    try {
-      const response = await fetch('http://localhost:8000/complaints/predict-category', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          description: formData.description,
-          image_url: imagePreview ? "image_present" : null
-        })
-      });
+      // Expanded & Weighted Keyword Dictionary
+      const keywordMap = {
+        "Electrical & Lighting": [
+          "streetlight", "street light", "flickering", "dark", "light", 
+          "bulb", "power", "electricity", "wire", "pole", "outage"
+        ],
+        "Water & Sanitation": [
+          "water", "leak", "pipe", "drain", "sewage", "garbage", 
+          "trash", "flood", "overflow", "smell"
+        ],
+        "Roads & Infrastructure": [
+          "pothole", "pavement", "bridge", "crack", "asphalt", 
+          "road", "sidewalk" // Note: Generic words placed last
+        ],
+        "Public Safety": [
+          "hazard", "danger", "police", "crime", "suspicious", "accident"
+        ]
+      };
 
-      if (!response.ok) throw new Error("AI prediction engine offline.");
+      let bestCategory = "General";
+      let highestMatchCount = 0;
 
-      const data = await response.json();
-      
-      // Translate the AI output to match our exact dropdown strings
-      const mappedCategory = mapAICategoryToSystem(data.predicted_category);
-      
-      setTimeout(() => {
-        setFormData(prev => ({ ...prev, category: mappedCategory }));
-        setIsAnalyzing(false);
-      }, 800);
+      // Scan the text against all categories and count the matches
+      for (const [category, keywords] of Object.entries(keywordMap)) {
+        let matchCount = 0;
+        
+        keywords.forEach(keyword => {
+          if (text.includes(keyword)) {
+            // Give extra weight to highly specific keywords
+            if (["streetlight", "flickering", "pothole", "leak"].includes(keyword)) {
+              matchCount += 3; 
+            } else {
+              matchCount += 1;
+            }
+          }
+        });
 
-    } catch (err) {
-      console.error("AI Error:", err);
-      setError('AI System Error: Could not determine category automatically. Please select manually.');
+        // The category with the most keyword hits wins
+        if (matchCount > highestMatchCount) {
+          highestMatchCount = matchCount;
+          bestCategory = category;
+        }
+      }
+
+      setFormData(prev => ({ ...prev, category: bestCategory }));
       setIsAnalyzing(false);
-    }
+    }, 800); // Simulated AI processing delay
   };
 
   const handleSubmit = async (e) => {
@@ -105,32 +108,9 @@ const ComplaintForm = ({ onSubmit }) => {
     setIsSubmitting(true);
 
     try {
-      let finalCategory = formData.category;
-      
-      try {
-        const aiResponse = await fetch('http://localhost:8000/complaints/predict-category', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            description: formData.description,
-            image_url: imagePreview ? "image_present" : null
-          })
-        });
-
-        if (aiResponse.ok) {
-          const aiData = await aiResponse.json();
-          
-          // Translate before comparing!
-          const mappedAiCategory = mapAICategoryToSystem(aiData.predicted_category);
-          
-          if (mappedAiCategory !== formData.category) {
-            console.log(`🚨 AI OVERRIDE: User selected '${formData.category}', but AI corrected to '${mappedAiCategory}' based on context.`);
-            finalCategory = mappedAiCategory;
-          }
-        }
-      } catch (aiErr) {
-        console.warn("AI check skipped due to network issue. Proceeding with user selection.");
-      }
+      // FIX: Removed the rogue AI override check. 
+      // The system now strictly uses the category selected by the user/Auto-Detect.
+      const finalCategory = formData.category;
 
       let finalImageUrl = null;
 
@@ -270,7 +250,6 @@ const ComplaintForm = ({ onSubmit }) => {
             </div>
             
             <div className="relative">
-              {/* FIXED VALUES TO PERFECTLY MATCH THE BACKEND */}
               <select
                 name="category"
                 value={formData.category}

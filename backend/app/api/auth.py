@@ -83,18 +83,24 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login")
 def login_user(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == form_data.username).first()
+    # 1. Find user by email OR phone number
+    user = db.query(User).filter(
+        (User.email == form_data.username) | (User.phone_number == form_data.username)
+    ).first()
     
     if not user or not auth_service.verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail="Incorrect email/phone or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
         
+    # --- 2FA INTERCEPTOR (CITIZENS ONLY) ---
     if user.role.lower() == "citizen" and user.email != "citizen@smartcity.com":
         otp_code = email_service.generate_otp()
         
+        # FIX: Store using user.email as the consistent key, 
+        # but return user.email to the frontend so it knows where to route the OTP verification step
         OTP_STORE[user.email] = {
             "code": otp_code,
             "expires_at": datetime.utcnow() + timedelta(minutes=5)
@@ -106,9 +112,10 @@ def login_user(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = D
         return {
             "message": "2FA Verification Required",
             "require_2fa": True,
-            "email": user.email
+            "email": user.email  # Frontend uses this email for the verify-otp payload
         }
 
+    # --- IMMEDIATE ACCESS ---
     access_token = auth_service.create_access_token(
         data={"sub": str(user.id), "role": user.role, "full_name": user.full_name}
     )
@@ -121,6 +128,8 @@ def login_user(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = D
 
 @router.post("/verify-otp", response_model=Token)
 def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
+    """Step 2 of 2FA Login"""
+    # request.email here corresponds to the email sent back from the login interceptor
     stored_data = OTP_STORE.get(request.email)
     
     if not stored_data:
@@ -136,6 +145,9 @@ def verify_otp(request: OTPVerifyRequest, db: Session = Depends(get_db)):
     del OTP_STORE[request.email]
     
     user = db.query(User).filter(User.email == request.email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User registry conflict.")
+        
     access_token = auth_service.create_access_token(
         data={"sub": str(user.id), "role": user.role, "full_name": user.full_name}
     )

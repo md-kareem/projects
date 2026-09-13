@@ -16,6 +16,9 @@ function Login() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   
+  // FIX: Added the missing state variable for phone-number 2FA routing
+  const [pendingEmail, setPendingEmail] = useState('');
+  
   // Ambient Lighting & Animation States
   const [uiState, setUiState] = useState('idle'); // 'idle', 'typing', 'loading', 'success', 'error'
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -58,9 +61,6 @@ function Login() {
     
     // 3. Wait exactly 2 seconds for the animation to expand, then route!
     setTimeout(() => {
-      // BUG FIX: We must use window.location.href here instead of navigate()
-      // This forces a hard page reload so your AuthContext properly 
-      // reads the new token we just saved from the OTP verification!
       window.location.href = '/dashboard';
     }, 2000);
   };
@@ -79,6 +79,7 @@ function Login() {
 
     if (result.require_2fa) {
       setShowOTP(true);
+      setPendingEmail(result.email); // FIX: Safely stores the resolved email backend mapping
       setError('');
       setUiState('idle'); 
     } else if (!result.success) {
@@ -106,7 +107,7 @@ function Login() {
       const response = await fetch('http://localhost:8000/api/auth/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: credentials.email, otp_code: otpCode })
+        body: JSON.stringify({ email: pendingEmail, otp_code: otpCode }) // FIX: Uses pendingEmail instead of raw input
       });
 
       const data = await response.json();
@@ -214,7 +215,7 @@ function Login() {
                 </h2>
                 <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-widest leading-relaxed">
                   A 6-digit secure code has been routed to<br/>
-                  <span className="text-zinc-300">{credentials.email}</span>
+                  <span className="text-zinc-300">{pendingEmail}</span>
                 </p>
               </div>
 
@@ -298,19 +299,19 @@ function Login() {
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div>
                   <label className={`block text-[10px] font-mono mb-2 uppercase tracking-widest transition-colors ${uiState === 'typing' ? 'text-blue-400' : 'text-zinc-500'}`}>
-                    {activeTab === 'Dept' ? 'Department' : activeTab} Official Email
+                    {activeTab === 'Dept' ? 'Department' : activeTab} Official Email or Phone
                   </label>
                   <div className="relative group">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                       <Mail size={16} className={`transition-colors ${uiState === 'typing' ? 'text-blue-500' : 'text-zinc-600'}`} />
                     </div>
                     <input
-                      type="email"
+                      type="text" // FIX: Supports phone numbers without triggering HTML email validation
                       name="email"
                       value={credentials.email}
                       onChange={handleChange}
                       className={`w-full bg-zinc-950/50 rounded-lg pl-12 pr-4 py-3.5 outline-none transition-all font-sans shadow-inner border ${getInputClass()}`}
-                      placeholder="ID@smartcity.gov" 
+                      placeholder="ID@smartcity.gov or mobile number" 
                     />
                   </div>
                 </div>

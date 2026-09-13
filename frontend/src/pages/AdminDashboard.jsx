@@ -4,6 +4,7 @@ import { useLocation } from "react-router-dom";
 import ComplaintCard from "../components/ComplaintCard";
 import Sidebar from "../components/Sidebar";
 import EditProfile from "../components/EditProfile";
+import LiveClock from "../components/LiveClock";
 
 // Leaflet Map Imports
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
@@ -81,8 +82,26 @@ const AdminDashboard = () => {
           }
         });
         if (compRes.ok) {
-          const compData = await compRes.json();
-          setComplaints(compData);
+          const dbData = await compRes.json();
+          
+          // FIX: Format data to ensure ComplaintCard receives the real created_at timestamp
+          const formattedData = dbData.map((dbItem) => ({
+            id: dbItem.id,
+            title: dbItem.title,
+            description: dbItem.description,
+            category: dbItem.category || "General",
+            location: dbItem.address || "Location pending GPS",
+            lat: dbItem.location_lat,
+            lng: dbItem.location_lng,
+            date: "Recently",
+            created_at: dbItem.created_at, 
+            priority: dbItem.priority || dbItem.severity?.toLowerCase() || "medium",
+            status: dbItem.status || "Pending review",
+            image_url: dbItem.image_url,
+            report_count: dbItem.report_count || 1,
+          }));
+
+          setComplaints(formattedData.sort((a, b) => b.id - a.id));
         }
 
         // 2. Fetch Edit Requests
@@ -207,6 +226,8 @@ const AdminDashboard = () => {
 
             <div className="flex items-center gap-4">
               
+              <LiveClock />
+
               {/* NOTIFICATION BELL */}
               <div className="relative z-50">
                 <button 

@@ -13,7 +13,7 @@ import ComplaintCard from "../components/ComplaintCard";
 import Sidebar from "../components/Sidebar";
 import { useAuth } from "../context/AuthContext";
 import EditProfile from '../components/EditProfile';
-
+import LiveClock from "../components/LiveClock";
 
 const CitizenDashboard = () => {
   const { user } = useAuth();
@@ -45,7 +45,7 @@ const CitizenDashboard = () => {
 
         const dbData = await response.json();
 
-        // UPGRADED: Added category, lat, lng, and report_count for the new ComplaintCard
+        // UPGRADED: Added category, lat, lng, report_count, and created_at
         const formattedData = dbData.map((dbItem) => ({
           id: dbItem.id,
           title: dbItem.title,
@@ -55,6 +55,7 @@ const CitizenDashboard = () => {
           lat: dbItem.location_lat,
           lng: dbItem.location_lng,
           date: "Recently",
+          created_at: dbItem.created_at, // FIX: Maps the real DB timestamp to the card
           priority:
             dbItem.priority || dbItem.severity?.toLowerCase() || "medium",
           status: dbItem.status || "Pending review",
@@ -87,6 +88,7 @@ const CitizenDashboard = () => {
       lat: savedComplaint.location_lat,
       lng: savedComplaint.location_lng,
       date: "Just now",
+      created_at: savedComplaint.created_at || new Date().toISOString(), // FIX: Grabs the live timestamp for new submissions
       priority: savedComplaint.severity || "medium",
       status: savedComplaint.status || "Pending review",
       image_url: savedComplaint.image_url || null,
@@ -141,14 +143,19 @@ const CitizenDashboard = () => {
               </div>
             </div>
 
-            <div className="flex items-center gap-3 bg-zinc-900/50 px-4 py-2 rounded-lg border border-zinc-800 shadow-inner">
-              <span className="flex h-3 w-3 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-              </span>
-              <span className="text-xs font-mono text-emerald-500 uppercase tracking-widest">
-                {myComplaints.length} Total Submissions
-              </span>
+            {/* INTEGRATED LIVE CLOCK & DATA INDICATOR */}
+            <div className="flex items-center gap-4">
+              <LiveClock />
+              
+              <div className="flex items-center gap-3 bg-zinc-900/50 px-4 py-2 rounded-lg border border-zinc-800 shadow-inner">
+                <span className="flex h-3 w-3 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                </span>
+                <span className="text-xs font-mono text-emerald-500 uppercase tracking-widest hidden sm:inline">
+                  {myComplaints.length} Total Submissions
+                </span>
+              </div>
             </div>
           </div>
 

@@ -10,11 +10,12 @@ import {
   MapPin,
   Navigation 
 } from "lucide-react";
-import { useLocation } from "react-router-dom"; // <-- ADDED THIS IMPORT
+import { useLocation } from "react-router-dom"; 
 import ComplaintCard from "../components/ComplaintCard";
 import Sidebar from "../components/Sidebar";
 import { useAuth } from "../context/AuthContext";
 import EditProfile from '../components/EditProfile';
+import LiveClock from "../components/LiveClock";
 
 // Leaflet Map Imports
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
@@ -75,7 +76,8 @@ const DepartmentDashboard = () => {
   const queryParams = new URLSearchParams(location.search);
   const currentView = queryParams.get("view") || "dispatch";
 
-  const [activeFilter, setActiveFilter] = useState("All");
+  const [activeFilter, useStateFilter] = useState("All");
+  const setActiveFilter = useStateFilter; // Just aliasing to prevent React unused warnings if modified later
 
   // Real database states
   const [departmentTasks, setDepartmentTasks] = useState([]);
@@ -114,6 +116,7 @@ const DepartmentDashboard = () => {
         lat: dbItem.location_lat,
         lng: dbItem.location_lng,
         date: "Recently",
+        created_at: dbItem.created_at, // FIX: Passes actual timestamp to ComplaintCard
         priority: dbItem.priority || dbItem.severity?.toLowerCase() || "medium",
         status: dbItem.status || "Pending",
         image_url: dbItem.image_url,
@@ -207,10 +210,14 @@ const DepartmentDashboard = () => {
               </div>
             </div>
 
-            <div className="px-4 py-2 bg-blue-950/30 border border-blue-900/50 rounded-lg">
-              <p className="text-xs font-mono text-blue-400 uppercase tracking-widest text-center">
-                Active Units: 2
-              </p>
+            {/* INTEGRATED LIVE CLOCK & DATA INDICATOR */}
+            <div className="flex items-center gap-4">
+              <LiveClock />
+              <div className="px-4 py-2 bg-blue-950/30 border border-blue-900/50 rounded-lg shadow-inner">
+                <p className="text-xs font-mono text-blue-400 uppercase tracking-widest text-center">
+                  Active Units: 2
+                </p>
+              </div>
             </div>
           </div>
 

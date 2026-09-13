@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { CheckCircle, Truck, Wrench, Loader2, Navigation, AlertOctagon, Camera, X, Upload } from "lucide-react";
-import { useLocation } from "react-router-dom"; // <-- ADDED MISSING IMPORT
+import { useLocation } from "react-router-dom"; 
 import ComplaintCard from "../components/ComplaintCard";
 import Sidebar from "../components/Sidebar";
 import { useAuth } from "../context/AuthContext";
 import EditProfile from '../components/EditProfile';
+import LiveClock from "../components/LiveClock";
 
 const WorkerDashboard = () => {
   const { user } = useAuth();
@@ -48,6 +49,7 @@ const WorkerDashboard = () => {
         lat: dbItem.location_lat,
         lng: dbItem.location_lng,
         date: "Recently",
+        created_at: dbItem.created_at, // FIX: Maps the real DB timestamp to the card
         priority: dbItem.priority || dbItem.severity?.toLowerCase() || "medium",
         status: dbItem.status || "Assigned",
         image_url: dbItem.image_url,
@@ -132,7 +134,7 @@ const WorkerDashboard = () => {
         <div className="max-w-4xl mx-auto space-y-6 relative z-10">
           
           {/* Header */}
-          <div className="flex flex-col gap-4 border-b border-zinc-800 pb-6 mt-4 md:mt-0">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-zinc-800 pb-6 mt-4 md:mt-0">
             <div className="flex items-center gap-4">
               <div className="p-3 bg-zinc-900 border border-zinc-700 rounded-xl text-emerald-500 shadow-inner">
                 <Truck size={32} />
@@ -146,6 +148,11 @@ const WorkerDashboard = () => {
                   {currentView === 'settings' ? " // IDENTITY MANAGEMENT" : " // ACTIVE DISPATCH"}
                 </p>
               </div>
+            </div>
+
+            {/* INTEGRATED LIVE CLOCK */}
+            <div className="flex items-center gap-4">
+              <LiveClock />
             </div>
           </div>
 
@@ -266,7 +273,6 @@ const WorkerDashboard = () => {
                 <label className="w-full h-48 border-2 border-dashed border-zinc-700 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-emerald-500 hover:bg-emerald-950/20 transition-all group">
                   <Camera size={40} className="text-zinc-500 group-hover:text-emerald-400 mb-3 transition-colors" />
                   <span className="text-zinc-400 font-mono text-sm uppercase tracking-widest group-hover:text-emerald-300">Tap to Open Camera</span>
-                  {/* The capture="environment" tag forces mobile phones to open the back camera natively! */}
                   <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageCapture} />
                 </label>
               )}
