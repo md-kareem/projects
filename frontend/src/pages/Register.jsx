@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Shield, User, Mail, Key, Phone, MapPin, Globe, AlertCircle, Loader2, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import logo from '../assets/scc-logo.png'; // Official Branding Injected
 
 const Register = () => {
   const { register } = useAuth(); 
@@ -101,10 +102,10 @@ const Register = () => {
       <div className="w-full max-w-2xl z-10">
         <div className="vault-card p-8 border-zinc-800/80 shadow-2xl bg-zinc-950/80 backdrop-blur-sm rounded-xl">
           
-          {/* Header */}
+          {/* Header with Custom Logo */}
           <div className="flex flex-col items-center text-center mb-8">
-            <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-2xl mb-4 shadow-inner">
-              <Shield size={40} className="text-emerald-500" />
+            <div className="w-28 h-28 mb-4 rounded-3xl overflow-hidden relative transition-all duration-500 border border-zinc-800 shadow-[0_0_20px_rgba(0,0,0,0.5)]">
+              <img src={logo} alt="SCC Logo" className="w-full h-full object-cover" />
             </div>
             <h1 className="text-2xl font-bold text-zinc-100 uppercase tracking-widest">
               Citizen/Resident <span className="text-emerald-500">Registry</span>

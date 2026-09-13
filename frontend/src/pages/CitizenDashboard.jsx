@@ -14,6 +14,7 @@ import Sidebar from "../components/Sidebar";
 import { useAuth } from "../context/AuthContext";
 import EditProfile from '../components/EditProfile';
 import LiveClock from "../components/LiveClock";
+import bgImage from '../assets/SCC-BG-Plain.png';
 
 const CitizenDashboard = () => {
   const { user } = useAuth();
@@ -117,23 +118,27 @@ const CitizenDashboard = () => {
     <div className="flex h-screen bg-zinc-950 overflow-hidden">
       <Sidebar />
 
-      <main className="flex-1 overflow-y-auto p-6 md:p-10 relative">
+      {/* LOWERED OPACITY: Changed from 0.85 down to 0.50 so the image pops! */}
+      <main 
+        className="flex-1 overflow-y-auto p-6 md:p-10 relative bg-fixed bg-center bg-cover"
+        style={{ backgroundImage: `linear-gradient(to bottom, rgba(9, 9, 11, 0.50), rgba(9, 9, 11, 0.70)), url(${bgImage})` }}
+      >
         <div className="absolute top-[-10%] right-[-5%] w-[40%] h-[40%] bg-emerald-900/10 blur-[120px] rounded-full pointer-events-none"></div>
 
         <div className="max-w-6xl mx-auto space-y-8 relative z-10">
           
           {/* HEADER */}
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-zinc-800 pb-6">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-zinc-800/80 pb-6">
             <div className="flex items-center gap-4">
-              <div className="p-3 bg-zinc-900 border border-zinc-700 rounded-xl text-emerald-500 shadow-inner">
+              <div className="p-3 bg-zinc-900 border border-zinc-700 rounded-xl text-emerald-500 shadow-inner backdrop-blur-md">
                 <UserCircle size={32} />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-zinc-100 uppercase tracking-widest">
+                <h1 className="text-2xl font-bold text-zinc-100 uppercase tracking-widest text-shadow-sm">
                   CITIZEN/RESIDENT{" "}
                   <span className="text-emerald-500">TERMINAL</span>
                 </h1>
-                <p className="text-xs font-mono text-zinc-500 mt-1 uppercase tracking-widest">
+                <p className="text-xs font-mono text-zinc-400 mt-1 uppercase tracking-widest">
                   WELCOME BACK //{" "}
                   {user?.full_name
                     ? user.full_name.toUpperCase()
@@ -147,7 +152,7 @@ const CitizenDashboard = () => {
             <div className="flex items-center gap-4">
               <LiveClock />
               
-              <div className="flex items-center gap-3 bg-zinc-900/50 px-4 py-2 rounded-lg border border-zinc-800 shadow-inner">
+              <div className="flex items-center gap-3 bg-zinc-900/50 backdrop-blur-md px-4 py-2 rounded-lg border border-zinc-800 shadow-inner">
                 <span className="flex h-3 w-3 relative">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
@@ -218,7 +223,7 @@ const CitizenDashboard = () => {
                     ))}
 
                     {filteredLogs.length === 0 && (
-                      <div className="col-span-full p-12 text-center border-2 border-dashed border-zinc-800 rounded-xl bg-zinc-900/30">
+                      <div className="col-span-full p-12 text-center border-2 border-dashed border-zinc-800/80 rounded-xl bg-zinc-900/30 backdrop-blur-md">
                         <History
                           size={32}
                           className="mx-auto text-zinc-600 mb-3"
