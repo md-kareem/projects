@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Key, Mail, Loader2, Lock, ArrowLeft, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
+import { Key, Mail, Loader2, Lock, ArrowLeft, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
+import logo from '../assets/scc-logo.png';
 
 function Login() {
   const { login, isLoading } = useAuth();
@@ -185,17 +186,17 @@ function Login() {
       <div className={`w-full max-w-md z-10 transition-all duration-700 ${isTransitioning ? 'opacity-0 scale-90 blur-sm' : 'opacity-100 scale-100'}`}>
         <div className={`p-8 rounded-xl backdrop-blur-md transition-all duration-500 border ${getCardStyles()}`}>
 
+          {/* BRANDING LOGO INJECTION */}
           <div className="flex flex-col items-center text-center mb-6">
-            <div className={`p-4 rounded-2xl mb-4 shadow-inner relative overflow-hidden transition-colors duration-500 ${uiState === 'success' ? 'bg-emerald-950/50 border-emerald-900/50' : 'bg-zinc-900 border border-zinc-800'}`}>
-              {uiState === 'success' ? (
-                <CheckCircle2 size={40} className="text-emerald-500 relative z-10 animate-in zoom-in" />
-              ) : (
-                <Shield size={40} className={`relative z-10 transition-colors duration-500 ${uiState === 'typing' ? 'text-blue-500' : 'text-emerald-500'}`} />
-              )}
+            <div className={`w-32 h-32 mb-4 rounded-3xl overflow-hidden relative transition-all duration-500 border ${
+              uiState === 'success' 
+                ? 'border-emerald-500 shadow-[0_0_40px_rgba(16,185,129,0.4)]' 
+                : uiState === 'typing'
+                ? 'border-blue-500/50 shadow-[0_0_30px_rgba(59,130,246,0.3)]'
+                : 'border-zinc-800 shadow-[0_0_20px_rgba(0,0,0,0.5)]'
+            }`}>
+              <img src={logo} alt="SCC Logo" className="w-full h-full object-cover" />
             </div>
-            <h1 className="text-2xl font-bold text-zinc-100 uppercase tracking-widest">
-              SmartCity <span className={uiState === 'typing' ? 'text-blue-500 transition-colors' : 'text-emerald-500 transition-colors'}>Connect</span>
-            </h1>
             <p className="text-xs font-mono text-zinc-500 mt-2 uppercase tracking-widest">
               Secure Access Terminal
             </p>
@@ -306,7 +307,7 @@ function Login() {
                       <Mail size={16} className={`transition-colors ${uiState === 'typing' ? 'text-blue-500' : 'text-zinc-600'}`} />
                     </div>
                     <input
-                      type="text" // FIX: Supports phone numbers without triggering HTML email validation
+                      type="text" 
                       name="email"
                       value={credentials.email}
                       onChange={handleChange}

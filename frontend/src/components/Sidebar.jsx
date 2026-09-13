@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   Power,
-  Shield,
   LayoutDashboard,
   Map,
   Zap,
@@ -16,6 +15,7 @@ import {
 } from "lucide-react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import logo from '../assets/scc-logo.png'; // Official Branding Injected
 
 const Sidebar = () => {
   const { logout, user } = useAuth();
@@ -70,18 +70,21 @@ const Sidebar = () => {
 
       {/* Main Scrollable Area (Allows dropdowns without breaking layout) */}
       <div className="flex-1 overflow-y-auto no-scrollbar">
-        {/* Logo Area */}
+        
+        {/* BRANDED LOGO AREA */}
         <div className={`flex items-center ${isExpanded ? "px-6 justify-start" : "justify-center"} mb-12 transition-all duration-300`}>
-          <div className="w-10 h-10 min-w-[40px] bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-center shadow-inner">
-            <Shield className="text-emerald-500" size={20} />
-          </div>
+          <img 
+            src={logo} 
+            alt="SCC Logo" 
+            className="w-10 h-10 min-w-[40px] rounded-xl border border-zinc-700 shadow-[0_0_15px_rgba(16,185,129,0.3)] object-cover" 
+          />
 
           <div className={`overflow-hidden whitespace-nowrap transition-all duration-300 flex flex-col justify-center ${isExpanded ? "w-32 opacity-100 ml-3" : "w-0 opacity-0 ml-0"}`}>
-            <h2 className="font-bold text-zinc-100 uppercase tracking-widest text-sm leading-tight">
-              SmartCity
+            <h2 className="font-bold text-zinc-100 uppercase tracking-widest text-sm leading-tight font-mono">
+              SCC <span className="text-emerald-500">HUB</span>
             </h2>
-            <p className="text-[10px] text-emerald-500 font-mono tracking-widest">
-              NETWORK
+            <p className="text-[9px] text-zinc-500 font-mono tracking-widest mt-0.5 uppercase">
+              SmartCity Connect
             </p>
           </div>
         </div>
@@ -122,7 +125,7 @@ const Sidebar = () => {
                 </span>
               </Link>
 
-              {/* NEW: NESTED REPORTS MENU */}
+              {/* NESTED REPORTS MENU */}
               <div className="flex flex-col overflow-hidden">
                 <button
                   onClick={() => { 
