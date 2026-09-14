@@ -9,8 +9,9 @@ const formatTimestamp = (isoString) => {
     const d = new Date(isoString);
     if (isNaN(d.getTime())) return { date: isoString, time: '' };
 
-    const dateStr = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(d);
-    const timeStr = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true }).format(d);
+    // Always shown in IST, regardless of the viewer's own device/browser timezone.
+    const dateStr = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' }).format(d);
+    const timeStr = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }).format(d);
 
     return { date: dateStr, time: timeStr };
   } catch (e) {

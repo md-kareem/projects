@@ -229,7 +229,7 @@ const AdminDashboard = () => {
                   </div>
                 ) : (
                   filteredRequests.map((req) => (
-                    <div key={req.id} className="flex flex-col md:flex-row gap-3 p-4 bg-gray-50 border border-gray-200 rounded-lg justify-between items-start md:items-center">
+                    <div key={req.id} className="flex flex-col md:flex-row gap-3 p-4 bg-gray-50 border border-gray-200 rounded-lg justify-between items-start">
                       <div className="flex-1">
                         <h3 className="text-sm font-medium text-gray-900">{req.user_name}</h3>
                         <span className="badge badge-amber mt-1 mb-2 capitalize">{req.role}</span>
