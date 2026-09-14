@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { UploadCloud, MapPin, AlertCircle, Loader2, Sparkles, Bot } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { UploadCloud, MapPin, AlertCircle, Loader2, Bot } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import MapComponent from './MapComponent';
 
@@ -19,6 +19,49 @@ const ComplaintForm = ({ onSubmit }) => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState('');
 
+  const debounceRef = useRef(null);
+
+  // Real backend AI (zero-shot text classifier) - not a local guess.
+  // Note: this only ever reads the title/description text; there's no
+  // vision model in this app, so a photo's actual content is never analyzed
+  // even though attaching one can trigger this.
+  //
+  // Re-runs on every description/title edit and overwrites the category
+  // with the latest result - including one you picked manually - so editing
+  // the description after picking the wrong category corrects it. A manual
+  // pick is only left undisturbed until you next edit the description/title.
+  const detectCategory = async (text) => {
+    if (!text.trim()) return;
+
+    setIsAnalyzing(true);
+    try {
+      const response = await fetch('/complaints/predict-category', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: text }),
+      });
+      if (!response.ok) throw new Error();
+      const data = await response.json();
+      setFormData((prev) => ({ ...prev, category: data.predicted_category }));
+    } catch (err) {
+      console.error('Auto category detection failed:', err);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  // Auto-detect shortly after the user stops typing the title/description
+  useEffect(() => {
+    const text = `${formData.title} ${formData.description}`.trim();
+    if (!text) return;
+
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => detectCategory(text), 900);
+
+    return () => clearTimeout(debounceRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.title, formData.description]);
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -32,43 +75,11 @@ const ComplaintForm = ({ onSubmit }) => {
       const reader = new FileReader();
       reader.onload = (e) => setImagePreview(e.target.result);
       reader.readAsDataURL(file);
+
+      // Also try detecting right away using whatever text has been entered so far
+      const text = `${formData.title} ${formData.description}`.trim();
+      if (text) detectCategory(text);
     }
-  };
-
-  const handleAutoDetect = () => {
-    setIsAnalyzing(true);
-
-    setTimeout(() => {
-      const text = `${formData.title} ${formData.description}`.toLowerCase();
-
-      const keywordMap = {
-        'Electrical & Lighting': ['streetlight', 'street light', 'flickering', 'dark', 'light', 'bulb', 'power', 'electricity', 'wire', 'pole', 'outage'],
-        'Water & Sanitation': ['water', 'leak', 'pipe', 'drain', 'sewage', 'garbage', 'trash', 'flood', 'overflow', 'smell'],
-        'Roads & Infrastructure': ['pothole', 'pavement', 'bridge', 'crack', 'asphalt', 'road', 'sidewalk'],
-        'Public Safety': ['hazard', 'danger', 'police', 'crime', 'suspicious', 'accident'],
-      };
-
-      let bestCategory = 'General';
-      let highestMatchCount = 0;
-
-      for (const [category, keywords] of Object.entries(keywordMap)) {
-        let matchCount = 0;
-
-        keywords.forEach((keyword) => {
-          if (text.includes(keyword)) {
-            matchCount += ['streetlight', 'flickering', 'pothole', 'leak'].includes(keyword) ? 3 : 1;
-          }
-        });
-
-        if (matchCount > highestMatchCount) {
-          highestMatchCount = matchCount;
-          bestCategory = category;
-        }
-      }
-
-      setFormData((prev) => ({ ...prev, category: bestCategory }));
-      setIsAnalyzing(false);
-    }, 800);
   };
 
   const handleSubmit = async (e) => {
@@ -197,15 +208,11 @@ const ComplaintForm = ({ onSubmit }) => {
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="label mb-0">Category</label>
-              <button
-                type="button"
-                onClick={handleAutoDetect}
-                disabled={isAnalyzing}
-                className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors disabled:opacity-50"
-              >
-                {isAnalyzing ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                {isAnalyzing ? 'Analyzing…' : 'Auto-detect'}
-              </button>
+              {isAnalyzing && (
+                <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 animate-in fade-in">
+                  <Loader2 size={12} className="animate-spin" /> Detecting…
+                </span>
+              )}
             </div>
 
             <div className="relative">
@@ -225,6 +232,9 @@ const ComplaintForm = ({ onSubmit }) => {
                 </div>
               )}
             </div>
+            <p className="text-[11px] text-gray-400 mt-1.5">
+              Category is detected automatically from your description — editing the description will update it, even after you've picked one manually.
+            </p>
           </div>
         </div>
 
