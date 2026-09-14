@@ -8,6 +8,9 @@ dispatch field workers; workers resolve and submit proof of completion.
 - **Backend:** FastAPI + SQLAlchemy (SQLite), JWT auth, local AI (zero-shot
   text classification via `transformers`, image blur detection via OpenCV,
   duplicate-report detection via sentence embeddings)
+
+> This document covers running the app locally for development. For
+> deploying it on a real server, see **[DEPLOYMENT.md](DEPLOYMENT.md)**.
 - **Frontend:** React 18 + Vite + Tailwind CSS, Leaflet maps
 
 ## Roles
