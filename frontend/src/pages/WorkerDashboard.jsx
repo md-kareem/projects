@@ -162,7 +162,7 @@ const WorkerDashboard = () => {
       </div>
 
       <main className="flex-1 overflow-y-auto p-4 md:p-7">
-        <div className="max-w-4xl mx-auto space-y-5">
+        <div className="max-w-2xl mx-auto space-y-5">
           {/* Header */}
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 border-b border-gray-200 pb-4 mt-4 md:mt-0">
             <div className="flex items-center gap-3">
